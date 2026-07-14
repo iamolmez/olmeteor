@@ -3,41 +3,69 @@ package com.olmeteors.meteorevents.hook;
 import com.olmeteors.meteorevents.MeteorPlugin;
 import com.palmergames.bukkit.towny.TownyAPI;
 import org.bukkit.Location;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.logging.Level;
+
+/** Classloader-safe Bukkit-only facade for the optional Towny integration. */
+public final class TownyHook {
+    private final Access access;
+
+    private TownyHook(Access access) {
+        this.access = Objects.requireNonNull(access, "access");
+    }
+
+    public static @NotNull TownyHook create(@NotNull MeteorPlugin plugin,
+                                             @Nullable Plugin townyPlugin) {
+        if (townyPlugin == null || !townyPlugin.isEnabled()) {
+            plugin.getLogger().info("Towny not installed or enabled - claim conflict detection disabled");
+            return new TownyHook(DisabledAccess.INSTANCE);
+        }
+        try {
+            Class.forName("com.palmergames.bukkit.towny.TownyAPI", false,
+                    townyPlugin.getClass().getClassLoader());
+            final TownyHook hook = new TownyHook(new TownyAccess(plugin));
+            plugin.getLogger().info("Towny hook initialized successfully");
+            return hook;
+        } catch (ClassNotFoundException | LinkageError | RuntimeException error) {
+            plugin.getLogger().log(Level.WARNING,
+                    "Towny API is missing or incompatible - claim detection disabled safely", error);
+            return new TownyHook(DisabledAccess.INSTANCE);
+        }
+    }
+
+    public boolean isAvailable() { return access.isAvailable(); }
+    public boolean isInClaim(@NotNull Location center, int radius) {
+        return access.isInClaim(center, Math.max(0, radius));
+    }
+
+    interface Access {
+        boolean isAvailable();
+        boolean isInClaim(Location center, int radius);
+    }
+
+    private enum DisabledAccess implements Access {
+        INSTANCE;
+        @Override public boolean isAvailable() { return false; }
+        @Override public boolean isInClaim(Location center, int radius) { return false; }
+    }
+}
 
 /**
  * Hook for Towny integration providing claim conflict detection.
  * Ensures meteor events only spawn in wilderness areas.
  */
-public final class TownyHook {
+final class TownyAccess implements TownyHook.Access {
 
     private final MeteorPlugin plugin;
     private boolean available;
 
-    public TownyHook(MeteorPlugin plugin) {
+    TownyAccess(MeteorPlugin plugin) {
         this.plugin = plugin;
-        checkAvailability();
-    }
-
-    private void checkAvailability() {
-        final var towny = plugin.getServer().getPluginManager().getPlugin("Towny");
-        if (towny == null || !towny.isEnabled()) {
-            this.available = false;
-            plugin.getLogger().info("Towny not installed or enabled - claim conflict detection disabled");
-            return;
-        }
-
-        try {
-            Class.forName("com.palmergames.bukkit.towny.TownyAPI");
-            this.available = true;
-            plugin.getLogger().info("Towny hook initialized successfully");
-        } catch (ClassNotFoundException | LinkageError error) {
-            this.available = false;
-            plugin.getLogger().log(Level.WARNING,
-                    "Towny API is missing or incompatible - claim conflict detection disabled", error);
-        }
+        this.available = true;
     }
 
     public boolean isAvailable() {

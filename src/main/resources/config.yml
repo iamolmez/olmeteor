@@ -1,6 +1,6 @@
 # ═══════════════════════════════════════════════════════════════
 #  OlMeteor - Meteor Event Plugin Configuration
-#  Version: 1.3.0
+#  Version: 1.4.0
 #  For Paper/Folia 1.21.1+
 # ═══════════════════════════════════════════════════════════════
 
@@ -74,6 +74,9 @@ automatic-events:
   # Yalnızca otomatik meteorlar için dünya spawnından aranacak uzaklık.
   min-distance-from-spawn: 100
   max-distance-from-spawn: 5000
+  # Spawn merkezli arama bölgesi: CIRCLE, SQUARE, TRIANGLE, DIAMOND, HEXAGON.
+  # Örnek: TRIANGLE + max-distance 500000 = 500 bin blokluk üçgen arama alanı.
+  search-shape: "CIRCLE"
   tps-guard:
     enabled: true
     minimum-tps: 18.0
@@ -87,6 +90,7 @@ automatic-events:
   worlds: []
   # Dünya kuralı yoksa bu konum preseti kullanılır.
   default-location-preset: "flat_surface"
+  # Dünya ayarına search-shape eklenirse global şekli yalnız o dünyada geçersiz kılar.
   # Komut örneği: /olmeteor auto dunya world grass_surface 5
   # Ağırlığı yüksek dünya daha sık seçilir. enabled: false o dünyayı kapatır.
   world-settings: {}
@@ -108,7 +112,7 @@ schematic:
 # ────────────────────────────────────────────────────────────────
 location-finder:
   # Hazır seçenekler: flat_surface, water_surface, underground, air, any_surface
-  active-preset: "flat_surface"
+  active-preset: "any_surface"
   presets:
     flat_surface:
       mode: "surface"
@@ -145,7 +149,7 @@ location-finder:
     any_surface:
       mode: "surface"
       require-flat: false
-      allow-water: true
+      allow-water: false
       allow-lava: false
       min-y: -64
       max-y: 320
@@ -307,6 +311,8 @@ meteor-types:
     rollback-duration-seconds: 30
     # Impact radius (blocks)
     impact-radius: 15
+    # CIRCLE, SQUARE, TRIANGLE, DIAMOND veya HEXAGON
+    radius-shape: "CIRCLE"
     # Boss health multiplier
     boss-health-multiplier: 1.0
     # Commands to execute when a player opens the vault
@@ -358,6 +364,7 @@ meteor-types:
     event-duration-seconds: 300
     rollback-duration-seconds: 30
     impact-radius: 25
+    radius-shape: "CIRCLE"
     boss-health-multiplier: 1.5
     rewards-commands:
       - "give %player% diamond 2"
@@ -392,6 +399,7 @@ meteor-types:
     event-duration-seconds: 300
     rollback-duration-seconds: 30
     impact-radius: 40
+    radius-shape: "CIRCLE"
     boss-health-multiplier: 2.0
     rewards-commands:
       - "give %player% diamond 3"
@@ -426,6 +434,7 @@ meteor-types:
     event-duration-seconds: 300
     rollback-duration-seconds: 30
     impact-radius: 60
+    radius-shape: "CIRCLE"
     boss-health-multiplier: 3.0
     rewards-commands:
       - "give %player% diamond 5"
@@ -461,6 +470,7 @@ meteor-types:
     event-duration-seconds: 300
     rollback-duration-seconds: 30
     impact-radius: 80
+    radius-shape: "CIRCLE"
     boss-health-multiplier: 4.0
     rewards-commands:
       - "give %player% netherite_ingot 2"
@@ -518,6 +528,7 @@ messages:
       invalid_type: "&cInvalid meteor type: &e%type%"
       scheduled: "&aMeteor event &e%eventId% &ascheduled at &e%location%"
       error: "&cAn error occurred while starting the event: %error%"
+      fawe_required: "&cThe meteor could not start: FAWE must be installed and enabled for safe schematic and terrain restoration."
       location_fail: "&cCould not find a suitable location for the meteor event. Try a different world or type."
       world_not_found: "&cWorld '%world%' not found."
       
@@ -549,6 +560,7 @@ messages:
       world: "&7World: &f%world%"
       location: "&7Location: &f%location%"
       radius: "&7Radius: &f%radius% blocks"
+      radius_shape: "&7Radius shape: &f%shape%"
       schematic: "&7Schematic: &f%schematic%"
       distance: "&7Distance to &e%player%&7: &f%distance% blocks"
       

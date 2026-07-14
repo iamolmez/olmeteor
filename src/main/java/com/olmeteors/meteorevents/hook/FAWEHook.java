@@ -22,48 +22,143 @@ import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import org.bukkit.Location;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.Objects;
 import java.util.logging.Level;
+
+/**
+ * Classloader-safe facade for FastAsyncWorldEdit.
+ *
+ * <p>Only Bukkit/JDK types cross this boundary. WorldEdit's Clipboard and edit
+ * session types live exclusively in {@link FAWEAccess}, which is instantiated
+ * only after FAWE and every required API class have been verified.</p>
+ */
+public final class FAWEHook {
+
+    private static final String[] REQUIRED_CLASSES = {
+            "com.sk89q.worldedit.WorldEdit",
+            "com.sk89q.worldedit.EditSession",
+            "com.sk89q.worldedit.bukkit.BukkitAdapter",
+            "com.sk89q.worldedit.extent.clipboard.Clipboard",
+            "com.fastasyncworldedit.core.Fawe"
+    };
+
+    private final Access access;
+
+    private FAWEHook(@NotNull Access access) {
+        this.access = Objects.requireNonNull(access, "access");
+    }
+
+    public static @NotNull FAWEHook create(@NotNull MeteorPlugin plugin,
+                                            @Nullable Plugin fawePlugin) {
+        Objects.requireNonNull(plugin, "plugin");
+        if (fawePlugin == null || !fawePlugin.isEnabled()) {
+            plugin.getLogger().info("FastAsyncWorldEdit is not installed/enabled; schematic features disabled");
+            return new FAWEHook(DisabledAccess.INSTANCE);
+        }
+        try {
+            final ClassLoader loader = fawePlugin.getClass().getClassLoader();
+            for (final String className : REQUIRED_CLASSES) {
+                Class.forName(className, false, loader);
+            }
+            final FAWEHook hook = new FAWEHook(new FAWEAccess(plugin));
+            plugin.getLogger().info("FastAsyncWorldEdit hook initialized successfully");
+            return hook;
+        } catch (ClassNotFoundException | LinkageError | RuntimeException error) {
+            plugin.getLogger().log(Level.WARNING,
+                    "FastAsyncWorldEdit API is missing or incompatible; schematic features disabled safely",
+                    error);
+            return new FAWEHook(DisabledAccess.INSTANCE);
+        }
+    }
+
+    public boolean isAvailable() { return access.isAvailable(); }
+    public @Nullable SchematicPasteBounds getSchematicPasteBounds(File file, Location center) {
+        return access.getSchematicPasteBounds(file, center);
+    }
+    public @NotNull CompletableFuture<Boolean> pasteSchematicAsync(File file, Location center) {
+        return access.pasteSchematicAsync(file, center);
+    }
+    public @Nullable Object captureTerrain(org.bukkit.World world, Location min, Location max) {
+        return access.captureTerrain(world, min, max);
+    }
+    public @NotNull CompletableFuture<Boolean> restoreTerrainAsync(
+            Object clipboard, org.bukkit.World world, Location origin) {
+        return access.restoreTerrainAsync(clipboard, world, origin);
+    }
+    public boolean writeRecoveryClipboard(Object clipboard, File output) {
+        return access.writeRecoveryClipboard(clipboard, output);
+    }
+    public @Nullable Object readRecoveryClipboard(File input) {
+        return access.readRecoveryClipboard(input);
+    }
+    public @NotNull CompletableFuture<Boolean> saveSchematicAsync(
+            File output, org.bukkit.World world, Location first, Location second) {
+        return access.saveSchematicAsync(output, world, first, second);
+    }
+    public @NotNull CompletableFuture<Boolean> clearAreaAsync(
+            org.bukkit.World world, Location first, Location second) {
+        return access.clearAreaAsync(world, first, second);
+    }
+    public @NotNull CompletableFuture<Boolean> createDefaultMeteorSchematicAsync(File output) {
+        return access.createDefaultMeteorSchematicAsync(output);
+    }
+
+    public record SchematicPasteBounds(@NotNull Location minimum,
+                                       @NotNull Location maximum) {}
+
+    interface Access {
+        boolean isAvailable();
+        SchematicPasteBounds getSchematicPasteBounds(File file, Location center);
+        CompletableFuture<Boolean> pasteSchematicAsync(File file, Location center);
+        Object captureTerrain(org.bukkit.World world, Location min, Location max);
+        CompletableFuture<Boolean> restoreTerrainAsync(
+                Object clipboard, org.bukkit.World world, Location origin);
+        boolean writeRecoveryClipboard(Object clipboard, File output);
+        Object readRecoveryClipboard(File input);
+        CompletableFuture<Boolean> saveSchematicAsync(
+                File output, org.bukkit.World world, Location first, Location second);
+        CompletableFuture<Boolean> clearAreaAsync(
+                org.bukkit.World world, Location first, Location second);
+        CompletableFuture<Boolean> createDefaultMeteorSchematicAsync(File output);
+    }
+
+    private enum DisabledAccess implements Access {
+        INSTANCE;
+        @Override public boolean isAvailable() { return false; }
+        @Override public SchematicPasteBounds getSchematicPasteBounds(File f, Location l) { return null; }
+        @Override public CompletableFuture<Boolean> pasteSchematicAsync(File f, Location l) { return failed(); }
+        @Override public Object captureTerrain(org.bukkit.World w, Location a, Location b) { return null; }
+        @Override public CompletableFuture<Boolean> restoreTerrainAsync(Object c, org.bukkit.World w, Location l) { return failed(); }
+        @Override public boolean writeRecoveryClipboard(Object c, File f) { return false; }
+        @Override public Object readRecoveryClipboard(File f) { return null; }
+        @Override public CompletableFuture<Boolean> saveSchematicAsync(File f, org.bukkit.World w, Location a, Location b) { return failed(); }
+        @Override public CompletableFuture<Boolean> clearAreaAsync(org.bukkit.World w, Location a, Location b) { return failed(); }
+        @Override public CompletableFuture<Boolean> createDefaultMeteorSchematicAsync(File f) { return failed(); }
+        private static CompletableFuture<Boolean> failed() {
+            return CompletableFuture.completedFuture(false);
+        }
+    }
+}
 
 /**
  * Hook for FastAsyncWorldEdit (FAWE) integration.
  * Provides asynchronous schematic pasting and terrain capture operations
  * using FAWE's high-performance API.
  */
-public final class FAWEHook {
+final class FAWEAccess implements FAWEHook.Access {
 
     private final MeteorPlugin plugin;
     private boolean available;
 
-    public FAWEHook(MeteorPlugin plugin) {
+    FAWEAccess(MeteorPlugin plugin) {
         this.plugin = plugin;
-        checkAvailability();
-    }
-
-    private void checkAvailability() {
-        final var pluginManager = plugin.getServer().getPluginManager();
-        final var fawe = pluginManager.getPlugin("FastAsyncWorldEdit");
-        final var worldEdit = pluginManager.getPlugin("WorldEdit");
-        if ((fawe == null || !fawe.isEnabled()) && (worldEdit == null || !worldEdit.isEnabled())) {
-            this.available = false;
-            plugin.getLogger().info("FAWE/WorldEdit not installed or enabled - schematic features disabled");
-            return;
-        }
-
-        try {
-            Class.forName("com.sk89q.worldedit.WorldEdit");
-            Class.forName("com.sk89q.worldedit.EditSession");
-            this.available = true;
-            plugin.getLogger().info("FAWE/WorldEdit hook initialized successfully");
-        } catch (ClassNotFoundException | LinkageError error) {
-            this.available = false;
-            plugin.getLogger().log(Level.WARNING,
-                    "FAWE/WorldEdit API is missing or incompatible - schematic features disabled", error);
-        }
+        this.available = true;
     }
 
     public boolean isAvailable() {
@@ -71,7 +166,7 @@ public final class FAWEHook {
     }
 
     /** Resolves the exact world bounds affected by the same centred paste logic. */
-    public @Nullable SchematicPasteBounds getSchematicPasteBounds(
+    public @Nullable FAWEHook.SchematicPasteBounds getSchematicPasteBounds(
             @NotNull File schematicFile, @NotNull Location center) {
         if (!available || center.getWorld() == null) return null;
         try {
@@ -96,16 +191,13 @@ public final class FAWEHook {
                     pasteAt.x() + sourceMax.x() - origin.x(),
                     pasteAt.y() + sourceMax.y() - origin.y(),
                     pasteAt.z() + sourceMax.z() - origin.z());
-            return new SchematicPasteBounds(minimum, maximum);
+            return new FAWEHook.SchematicPasteBounds(minimum, maximum);
         } catch (IOException | RuntimeException | LinkageError error) {
             plugin.getLogger().log(Level.WARNING,
                     "Could not read exact schematic bounds for " + schematicFile.getName(), error);
             return null;
         }
     }
-
-    public record SchematicPasteBounds(@NotNull Location minimum,
-                                       @NotNull Location maximum) {}
 
     /**
      * Pastes a schematic file at the given location asynchronously.
@@ -231,10 +323,10 @@ public final class FAWEHook {
      * @param origin    the origin location for the paste
      * @return CompletableFuture that completes with true on success
      */
-    public @NotNull CompletableFuture<Boolean> restoreTerrainAsync(@NotNull Clipboard clipboard,
+    public @NotNull CompletableFuture<Boolean> restoreTerrainAsync(@NotNull Object clipboardHandle,
                                                                     @NotNull org.bukkit.World world,
                                                                     @NotNull Location origin) {
-        if (!available) {
+        if (!available || !(clipboardHandle instanceof Clipboard clipboard)) {
             return CompletableFuture.completedFuture(false);
         }
 
@@ -275,8 +367,8 @@ public final class FAWEHook {
     }
 
     /** Writes an already captured terrain clipboard for crash recovery. */
-    public boolean writeRecoveryClipboard(@NotNull Clipboard clipboard, @NotNull File outputFile) {
-        if (!available) return false;
+    public boolean writeRecoveryClipboard(@NotNull Object clipboardHandle, @NotNull File outputFile) {
+        if (!available || !(clipboardHandle instanceof Clipboard clipboard)) return false;
         try {
             final File parent = outputFile.getParentFile();
             if (parent == null || (!parent.isDirectory() && !parent.mkdirs())) return false;

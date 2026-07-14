@@ -372,7 +372,10 @@ public final class MeteorCommand {
                     tell(sender, "info.phase", "phase", evt.phase().name());
                     tell(sender, "info.world", "world", evt.center().getWorld().getName());
                     tell(sender, "info.location", "location", formatLocation(evt.center()));
-                    tell(sender, "info.radius", "radius", String.valueOf(evt.meteorType().impactRadius()));
+                    tell(sender, "info.radius", "radius", String.valueOf(
+                            config.getTypeConfig(evt.meteorType()).impactRadius()));
+                    tell(sender, "info.radius_shape", "shape",
+                            config.getRadiusShape(evt.meteorType()).name());
                     tell(sender, "info.schematic", "schematic",
                             evt.schematicName() != null ? evt.schematicName() : "None");
 
@@ -642,24 +645,27 @@ public final class MeteorCommand {
     private void previewMeteor(@NotNull Player player, @NotNull MeteorType type) {
         final Location center = player.getLocation().toCenterLocation();
         final int radius = config.getTypeConfig(type).impactRadius();
+        final var radiusShape = config.getRadiusShape(type);
         final java.util.concurrent.atomic.AtomicReference<com.olmeteors.meteorevents.scheduler.FoliaScheduler.ScheduledTask>
                 reference = new java.util.concurrent.atomic.AtomicReference<>();
-        reference.set(plugin.getFoliaScheduler().runRepeatingAtLocation(center, () -> {
+        reference.set(plugin.getFoliaScheduler().runRepeatingForEntity(player, () -> {
             final World world = center.getWorld(); if (world == null) return;
             for (int angle=0; angle<360; angle+=10) {
                 final double rad=Math.toRadians(angle);
-                world.spawnParticle(org.bukkit.Particle.END_ROD, center.getX()+Math.cos(rad)*radius,
-                        center.getY()+1, center.getZ()+Math.sin(rad)*radius, 1,0,0,0,0);
+                final double edge=radiusShape.boundaryDistance(rad,radius);
+                player.spawnParticle(org.bukkit.Particle.END_ROD, center.getX()+Math.cos(rad)*edge,
+                        center.getY()+1, center.getZ()+Math.sin(rad)*edge, 1,0,0,0,0);
             }
-            config.getMobSpawnOffsets(type).forEach(offset -> world.spawnParticle(
+            config.getMobSpawnOffsets(type).forEach(offset -> player.spawnParticle(
                     org.bukkit.Particle.FLAME, center.clone().add(offset).add(0,1,0), 4, .15,.4,.15,0));
-            config.getChestOffsets(type).forEach(offset -> world.spawnParticle(
+            config.getChestOffsets(type).forEach(offset -> player.spawnParticle(
                     org.bukkit.Particle.HAPPY_VILLAGER, center.clone().add(offset).add(0,1,0), 6,.2,.3,.2,0));
         }, 1L, 10L));
         plugin.getFoliaScheduler().runLaterAtLocation(center, () -> {
             final var task=reference.get(); if(task!=null) plugin.getFoliaScheduler().cancelTask(task);
         }, 300L);
-        MessageUtil.sendMessage(player, "&a15 saniyelik önizleme başladı. &fEnd Rod=sınır, Alev=mob, Yeşil=ganimet.");
+        MessageUtil.sendMessage(player, "&a15 saniyelik önizleme başladı. &7Şekil: &e"
+                + radiusShape.name() + " &8• &fEnd Rod=sınır, Alev=mob, Yeşil=ganimet.");
     }
 
     private void showAutomaticStatus(@NotNull org.bukkit.command.CommandSender sender) {
@@ -689,7 +695,9 @@ public final class MeteorCommand {
         MessageUtil.sendMessage(sender, "&7Rastgele süre: &e" + config.getAutomaticMinMinutes()
                 + "-" + config.getAutomaticMaxMinutes() + " dakika"
                 + " &8• &7Spawn uzaklığı: &e" + config.getAutomaticMinDistance()
-                + "-" + config.getAutomaticMaxDistance() + " blok");
+                + "-" + config.getAutomaticMaxDistance() + " blok"
+                + " &8• &7Arama şekli: &e" + config.getAutomaticSearchShape(
+                        worlds.isEmpty() ? "__default__" : worlds.getFirst()));
         if (worlds.isEmpty()) {
             MessageUtil.sendMessage(sender, "&7Dünyalar: &fTüm yüklü dünyalar &8• &7Yüzey: &e"
                     + config.getAutomaticLocationPreset("__default__").name());
@@ -697,7 +705,8 @@ public final class MeteorCommand {
             MessageUtil.sendMessage(sender, "&6Auto dünya kuralları:");
             worlds.forEach(world -> MessageUtil.sendMessage(sender,
                     "&8• &b" + world + " &8→ &e" + config.getAutomaticPresetName(world)
-                            + " &7(ağırlık " + config.getAutomaticWorldWeight(world) + ")"));
+                            + " &7(" + config.getAutomaticSearchShape(world)
+                            + ", ağırlık " + config.getAutomaticWorldWeight(world) + ")"));
         }
     }
 

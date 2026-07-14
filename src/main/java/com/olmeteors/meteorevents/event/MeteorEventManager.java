@@ -16,6 +16,7 @@ import com.olmeteors.meteorevents.util.ParticleUtil;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -64,6 +65,8 @@ public final class MeteorEventManager implements Listener {
     private final Set<String> completionScheduled = ConcurrentHashMap.newKeySet();
     private final Set<String> combatCompletedEvents = ConcurrentHashMap.newKeySet();
     private final Set<String> rollbackStartedEvents = ConcurrentHashMap.newKeySet();
+    private final Set<String> cancelRequestedEvents = ConcurrentHashMap.newKeySet();
+    private final Set<String> impactPastePending = ConcurrentHashMap.newKeySet();
     private final Set<String> pendingWaves = ConcurrentHashMap.newKeySet();
     private final Map<String, Set<UUID>> eventParticipants = new ConcurrentHashMap<>();
     private final Map<String, FoliaScheduler.ScheduledTask> trackingTasks = new ConcurrentHashMap<>();
@@ -198,6 +201,10 @@ public final class MeteorEventManager implements Listener {
 
     private MeteorStartResult createAndStartEvent(MeteorType type, Location center,
                                                    CommandSender sender, MeteorFallMode fallMode) {
+        if (!plugin.getFAWEHook().isAvailable()) {
+            tellSafely(sender, "command.start.fawe_required");
+            return MeteorStartResult.ERROR;
+        }
         final var preStart = new com.olmeteors.meteorevents.api.event.MeteorPreStartEvent(type, center);
         plugin.getServer().getPluginManager().callEvent(preStart);
         if (preStart.isCancelled()) {
@@ -254,7 +261,12 @@ public final class MeteorEventManager implements Listener {
         final FoliaScheduler.ScheduledTask particleTask = scheduler.runRepeatingAtLocation(
                 center, () -> runPreImpactParticles(updated), 0L, mode == MeteorFallMode.SLOW ? 8L : 12L);
         final FoliaScheduler.ScheduledTask phaseTask = scheduler.runLaterAtLocation(center,
-                () -> beginImpactPhase(activeEvents.getOrDefault(event.eventId(), updated)), durationTicks);
+                () -> {
+                    final ActiveMeteorEvent latest = activeEvents.get(event.eventId());
+                    if (latest != null && latest.phase() == EventPhase.PRE_IMPACT) {
+                        beginImpactPhase(latest);
+                    }
+                }, durationTicks);
         activeEvents.put(event.eventId(), updated.withParticleTask(particleTask).withPhaseTask(phaseTask));
     }
 
@@ -293,7 +305,12 @@ public final class MeteorEventManager implements Listener {
         final long preImpactTicks = configManager.getTypeConfig(updatedEvent.meteorType())
                 .preImpactDurationTicks();
         final FoliaScheduler.ScheduledTask phaseTask = scheduler.runLaterAtLocation(center,
-                () -> beginImpactPhase(updatedEvent.withParticleTask(particleTask)),
+                () -> {
+                    final ActiveMeteorEvent latest = activeEvents.get(event.eventId());
+                    if (latest != null && latest.phase() == EventPhase.PRE_IMPACT) {
+                        beginImpactPhase(latest);
+                    }
+                },
                 preImpactTicks
         );
 
@@ -313,7 +330,7 @@ public final class MeteorEventManager implements Listener {
         if (world == null) return;
 
         // Sky flash effects
-        final int radius = event.meteorType().impactRadius();
+        final int radius = configManager.getTypeConfig(event.meteorType()).impactRadius();
         final double skyY = center.getY() + 50 + ThreadLocalRandom.current().nextDouble(30);
 
         // Create firework-like effects in the sky
@@ -344,8 +361,7 @@ public final class MeteorEventManager implements Listener {
         for (final Player player : plugin.getServer().getOnlinePlayers()) {
             scheduler.runForEntity(player, () -> {
                 if (!player.getWorld().equals(world)) return;
-                final double maxDistance = radius * 2.0;
-                if (player.getLocation().distanceSquared(center) < maxDistance * maxDistance) {
+                if (isInsideEvent(event, player.getLocation(), 2.0)) {
                     player.damage(0.001);
                 }
             });
@@ -356,7 +372,13 @@ public final class MeteorEventManager implements Listener {
      * Executes the impact phase - schematic pasting and initial explosion effects.
      */
     private void beginImpactPhase(@NotNull ActiveMeteorEvent event) {
-        final ActiveMeteorEvent updatedEvent = event.withPhase(EventPhase.IMPACT);
+        final ActiveMeteorEvent liveEvent = activeEvents.get(event.eventId());
+        if (liveEvent == null || liveEvent.phase() == EventPhase.IMPACT
+                || liveEvent.phase() == EventPhase.ACTIVE
+                || liveEvent.phase() == EventPhase.ROLLBACK
+                || liveEvent.phase() == EventPhase.CANCELLED
+                || liveEvent.phase() == EventPhase.COMPLETED) return;
+        final ActiveMeteorEvent updatedEvent = liveEvent.withPhase(EventPhase.IMPACT);
         activeEvents.put(event.eventId(), updatedEvent);
         historyStore.recordImpact(updatedEvent, automaticEventIds.contains(event.eventId()));
         locationFinder.recordImpact(updatedEvent.center());
@@ -366,7 +388,7 @@ public final class MeteorEventManager implements Listener {
 
         final Location center = updatedEvent.center();
         final World world = center.getWorld();
-        final int radius = updatedEvent.meteorType().impactRadius();
+        final int radius = configManager.getTypeConfig(updatedEvent.meteorType()).impactRadius();
 
         // Immediate /spawnat events do not pass through pre-impact, so chunks
         // must also be loaded here.
@@ -419,11 +441,17 @@ public final class MeteorEventManager implements Listener {
             activeEvents.remove(updatedEvent.eventId());
             clearCompletionTracking(updatedEvent.eventId());
             automaticEventIds.remove(updatedEvent.eventId());
+            historyStore.markResult(updatedEvent.eventId(), "SNAPSHOT_FAILED");
+            scheduler.releaseChunks(updatedEvent.world(),
+                    updatedEvent.center().getBlockX() >> 4,
+                    updatedEvent.center().getBlockZ() >> 4,
+                    configManager.getChunkForceLoadRadius());
             return;
         }
 
         // Do not place chests or spawn mobs until FAWE has actually finished.
         // Otherwise the late schematic paste can overwrite freshly placed chests.
+        impactPastePending.add(updatedEvent.eventId());
         schematicManager.pasteSchematicAsync(updatedEvent.schematicName(), center, world)
                 .whenComplete((success, error) -> scheduler.runAtLocation(center,
                         () -> finishImpactAfterPaste(updatedEvent, radius, success, error)));
@@ -445,38 +473,75 @@ public final class MeteorEventManager implements Listener {
 
     private void finishImpactAfterPaste(@NotNull ActiveMeteorEvent event, int radius,
                                         @Nullable Boolean success, @Nullable Throwable error) {
+        impactPastePending.remove(event.eventId());
         if (error != null || !Boolean.TRUE.equals(success)) {
             plugin.getLogger().log(Level.WARNING,
                     "Schematic paste failed; continuing with guaranteed reward chest for "
                             + event.eventId(), error);
         }
 
-        final ActiveMeteorEvent current = activeEvents.getOrDefault(event.eventId(), event);
-        if (current.phase() == EventPhase.ROLLBACK || current.phase() == EventPhase.COMPLETED
-                || current.phase() == EventPhase.CANCELLED) return;
+        final ActiveMeteorEvent current = activeEvents.get(event.eventId());
+        if (current == null || current.phase() == EventPhase.ROLLBACK
+                || current.phase() == EventPhase.COMPLETED) return;
+        if (current.phase() == EventPhase.CANCELLED) {
+            beginRollbackPhase(current);
+            return;
+        }
+        if (current.phase() != EventPhase.IMPACT) return;
 
         vaultManager.spawnVault(current.center(), current);
         spawnEventWaves(current);
-        particleUtil.spawnShockwaveRing(current.world(), current.center(), 1, radius, 1.0);
-        particleUtil.spawnExplosionEffect(current.world(), current.center(), radius * 2);
+        showImpactEffect(current, radius);
 
         final FoliaScheduler.ScheduledTask phaseTask = scheduler.runLaterAtLocation(current.center(),
-                () -> beginActivePhase(activeEvents.getOrDefault(current.eventId(), current)), 40L);
+                () -> {
+                    final ActiveMeteorEvent latest = activeEvents.get(current.eventId());
+                    if (latest != null && latest.phase() == EventPhase.IMPACT) {
+                        beginActivePhase(latest);
+                    }
+                }, 40L);
         activeEvents.put(current.eventId(), current.withPhaseTask(phaseTask));
+    }
+
+    /** Sends the impact outline as player packets, avoiding cross-region world access on Folia. */
+    private void showImpactEffect(@NotNull ActiveMeteorEvent event, int radius) {
+        final RadiusShape shape = configManager.getRadiusShape(event.meteorType());
+        final Location center = event.center();
+        final int points = Math.max(36, radius * 8);
+        final double viewDistance = Math.max(96.0, radius * 4.0);
+        for (final Player player : plugin.getServer().getOnlinePlayers()) {
+            scheduler.runForEntity(player, () -> {
+                final Location playerLocation = player.getLocation();
+                if (!playerLocation.getWorld().equals(center.getWorld())
+                        || playerLocation.distanceSquared(center) > viewDistance * viewDistance) return;
+
+                player.spawnParticle(Particle.EXPLOSION, center, 1, 0, 0, 0, 0);
+                player.spawnParticle(Particle.FLASH, center, 1, 0, 0, 0, 0);
+                for (int i = 0; i < points; i++) {
+                    final double angle = Math.PI * 2.0 * i / points;
+                    final double edge = shape.boundaryDistance(angle, radius);
+                    player.spawnParticle(Particle.SONIC_BOOM,
+                            center.getX() + Math.cos(angle) * edge,
+                            center.getY() + 1.0,
+                            center.getZ() + Math.sin(angle) * edge,
+                            1, 0, 0, 0, 0);
+                }
+            });
+        }
     }
 
     /**
      * Begins the active phase where hazards are enabled and players can fight.
      */
     private void beginActivePhase(@NotNull ActiveMeteorEvent event) {
-        final ActiveMeteorEvent updatedEvent = event.withPhase(EventPhase.ACTIVE);
+        final ActiveMeteorEvent liveEvent = activeEvents.get(event.eventId());
+        if (liveEvent == null || liveEvent.phase() != EventPhase.IMPACT) return;
+        final ActiveMeteorEvent updatedEvent = liveEvent.withPhase(EventPhase.ACTIVE);
         activeEvents.put(event.eventId(), updatedEvent);
         startTracking(updatedEvent);
         for (final Player player : plugin.getServer().getOnlinePlayers()) {
             scheduler.runForEntity(player, () -> {
-                final double range = event.meteorType().impactRadius() * 2.0;
-                if (player.getWorld().equals(event.world())
-                        && player.getLocation().distanceSquared(event.center()) <= range * range) {
+                if (isInsideEvent(event, player.getLocation(), 2.0)) {
                     eventParticipants.computeIfAbsent(event.eventId(),
                             ignored -> ConcurrentHashMap.newKeySet()).add(player.getUniqueId());
                 }
@@ -564,9 +629,11 @@ public final class MeteorEventManager implements Listener {
      * Begins the rollback phase to restore the area.
      */
     private void beginRollbackPhase(@NotNull ActiveMeteorEvent event) {
+        final ActiveMeteorEvent liveEvent = activeEvents.get(event.eventId());
+        if (liveEvent == null || liveEvent.phase() == EventPhase.COMPLETED) return;
         if (!rollbackStartedEvents.add(event.eventId())) return;
         plugin.getLogger().info("FORCED ROLLBACK STARTED for event " + event.eventId());
-        final ActiveMeteorEvent updatedEvent = event.withPhase(EventPhase.ROLLBACK);
+        final ActiveMeteorEvent updatedEvent = liveEvent.withPhase(EventPhase.ROLLBACK);
         activeEvents.put(event.eventId(), updatedEvent);
 
         // Every cleanup operation is isolated: one optional integration must
@@ -608,13 +675,15 @@ public final class MeteorEventManager implements Listener {
         }
 
         rollbackFuture.whenComplete((success, error) -> {
+            final boolean cancelled = cancelRequestedEvents.remove(updatedEvent.eventId());
             if (error != null) {
                 plugin.getLogger().log(Level.SEVERE,
                         "Terrain rollback future failed for " + updatedEvent.eventId(), error);
                 historyStore.markResult(updatedEvent.eventId(), "ROLLBACK_ERROR");
             } else if (Boolean.TRUE.equals(success)) {
-                historyStore.markResult(updatedEvent.eventId(),
-                        restoreStructure ? "RESTORED" : "STRUCTURE_KEPT");
+                historyStore.markResult(updatedEvent.eventId(), cancelled
+                        ? (restoreStructure ? "CANCELLED_RESTORED" : "CANCELLED_STRUCTURE_KEPT")
+                        : (restoreStructure ? "RESTORED" : "STRUCTURE_KEPT"));
                 if (restoreStructure) {
                     broadcastMsg("event.broadcast.restored",
                             "color", configManager.getMeteorTypeColor(event.meteorType()),
@@ -662,13 +731,46 @@ public final class MeteorEventManager implements Listener {
             return;
         }
 
+        cancelRequestedEvents.add(eventId);
+
         // Cancel all tasks
         cancelEventTasks(event);
+
+        // A paste may still be running during IMPACT. Mark the cancellation and
+        // let its completion callback start rollback, so paste and restore never race.
+        if (event.phase() == EventPhase.IMPACT && impactPastePending.contains(eventId)) {
+            activeEvents.put(eventId, event.withPhase(EventPhase.CANCELLED));
+            hazardManager.stopHazards(eventId);
+            displayEntityManager.removeEventEntities(eventId);
+            vaultManager.removeVault(eventId);
+            removeTrackedMobs(eventId);
+            historyStore.markResult(eventId, "CANCEL_REQUESTED");
+            tell(sender, "command.cancel.success", "eventId", eventId);
+            broadcastMsg("event.broadcast.cancelled",
+                    "color", configManager.getMeteorTypeColor(event.meteorType()),
+                    "name", configManager.getMeteorTypeName(event.meteorType()));
+            return;
+        }
+
+        if (event.phase() == EventPhase.IMPACT) {
+            beginRollbackPhase(event);
+            tell(sender, "command.cancel.success", "eventId", eventId);
+            return;
+        }
+
+        // Once blocks may have changed, cancellation is completed through the
+        // same deterministic terrain-restore path as a graceful stop.
+        if (event.phase() == EventPhase.ACTIVE || event.phase() == EventPhase.ROLLBACK) {
+            beginRollbackPhase(event);
+            tell(sender, "command.cancel.success", "eventId", eventId);
+            return;
+        }
 
         // Remove entities
         displayEntityManager.removeEventEntities(eventId);
         vaultManager.removeVault(eventId);
         hazardManager.stopHazards(eventId);
+        removeTrackedMobs(eventId);
 
         // Remove WG region
         if (event.wgRegionName() != null && wgHook.isAvailable()) {
@@ -683,7 +785,9 @@ public final class MeteorEventManager implements Listener {
 
         // Remove from active events
         activeEvents.remove(eventId);
+        rollbackSystem.discardSnapshot(eventId);
         clearCompletionTracking(eventId);
+        cancelRequestedEvents.remove(eventId);
         automaticEventIds.remove(eventId);
         historyStore.markResult(eventId, "CANCELLED");
 
@@ -705,6 +809,18 @@ public final class MeteorEventManager implements Listener {
 
         // Cancel tasks
         cancelEventTasks(event);
+
+        // Do not restore while FAWE is still pasting. The paste completion
+        // callback observes CANCELLED and starts rollback in the correct order.
+        if (event.phase() == EventPhase.IMPACT && impactPastePending.contains(eventId)) {
+            activeEvents.put(eventId, event.withPhase(EventPhase.CANCELLED));
+            displayEntityManager.removeEventEntities(eventId);
+            vaultManager.removeVault(eventId);
+            hazardManager.stopHazards(eventId);
+            removeTrackedMobs(eventId);
+            tell(sender, "command.stop.success", "eventId", eventId);
+            return;
+        }
 
         // Begin immediate rollback
         beginRollbackPhase(event);
@@ -747,6 +863,9 @@ public final class MeteorEventManager implements Listener {
         completionScheduled.clear();
         combatCompletedEvents.clear();
         rollbackStartedEvents.clear();
+        cancelRequestedEvents.clear();
+        impactPastePending.clear();
+        pendingWaves.clear();
         eventParticipants.clear();
     }
 
@@ -841,10 +960,15 @@ public final class MeteorEventManager implements Listener {
     }
 
     private void startAutomaticEvent(@NotNull MeteorType type, @NotNull World world) {
+        if (!plugin.getFAWEHook().isAvailable()) {
+            plugin.getLogger().warning("Automatic meteor skipped because FAWE is unavailable.");
+            return;
+        }
         final ConfigManager.LocationPreset preset =
                 configManager.getAutomaticLocationPreset(world.getName());
         locationFinder.findSuitableLocationAsync(world, type, preset,
-                configManager.getAutomaticMinDistance(), configManager.getAutomaticMaxDistance())
+                configManager.getAutomaticMinDistance(), configManager.getAutomaticMaxDistance(),
+                configManager.getAutomaticSearchShape(world.getName()))
                 .whenComplete((location, error) -> {
             if (error != null) {
                 plugin.getLogger().log(Level.WARNING, "Automatic location search failed", error);
@@ -902,7 +1026,7 @@ public final class MeteorEventManager implements Listener {
             final Location bossLocation = event.center().clone().add(0, 3, 0);
             scheduler.runAtLocation(bossLocation, () -> trackMob(event.eventId(),
                     mythicMobsHook.spawnBoss(bossMobId, bossLocation,
-                            event.meteorType().bossHealthMultiplier())));
+                            configManager.getTypeConfig(event.meteorType()).bossHealthMultiplier())));
         }
     }
 
@@ -976,7 +1100,7 @@ public final class MeteorEventManager implements Listener {
 
     /** Called by the vault/chest system after the event loot has been claimed. */
     public void markLootClaimed(@NotNull String eventId) {
-        lootClaimedEvents.add(eventId);
+        if (!lootClaimedEvents.add(eventId)) return;
         final ActiveMeteorEvent event = activeEvents.get(eventId);
         if (event == null || event.phase() == EventPhase.ROLLBACK
                 || event.phase() == EventPhase.COMPLETED
@@ -990,7 +1114,10 @@ public final class MeteorEventManager implements Listener {
         broadcastMsg("event.broadcast.all_chests_opened");
         plugin.getLogger().info("All reward chests claimed; forced rollback in 10 seconds: " + eventId);
         final FoliaScheduler.ScheduledTask cleanupTask = scheduler.runLaterAtLocation(event.center(),
-                () -> beginRollbackPhase(activeEvents.getOrDefault(eventId, event)), 200L);
+                () -> {
+                    final ActiveMeteorEvent latest = activeEvents.get(eventId);
+                    if (latest != null) beginRollbackPhase(latest);
+                }, 200L);
         activeEvents.put(eventId, event.withPhaseTask(cleanupTask));
     }
 
@@ -1026,7 +1153,10 @@ public final class MeteorEventManager implements Listener {
                 ? configManager.getUnattendedTimeoutMinutes() * 60L * 20L
                 : configManager.getCompletionCleanupDelaySeconds() * 20L;
         final FoliaScheduler.ScheduledTask cleanupTask = scheduler.runLaterAtLocation(event.center(),
-                () -> beginRollbackPhase(activeEvents.getOrDefault(eventId, event)), delay);
+                () -> {
+                    final ActiveMeteorEvent latest = activeEvents.get(eventId);
+                    if (latest != null) beginRollbackPhase(latest);
+                }, delay);
         activeEvents.put(eventId, event.withPhaseTask(cleanupTask));
     }
 
@@ -1038,6 +1168,7 @@ public final class MeteorEventManager implements Listener {
         combatCompletedEvents.remove(eventId);
         rollbackStartedEvents.remove(eventId);
         pendingWaves.remove(eventId);
+        impactPastePending.remove(eventId);
         eventParticipants.remove(eventId);
     }
 
@@ -1182,6 +1313,7 @@ public final class MeteorEventManager implements Listener {
         if (!combatCompletedEvents.add(event.eventId())) return;
         plugin.getLogger().info("Meteor combat completed; showing ranking: " + event.eventId());
         safely("unlock reward chests", () -> vaultManager.unlockEventChests(event.eventId()));
+        safely("distribute meteor keys", () -> vaultManager.distributeKeys(event));
         safely("grant leaderboard rewards", () -> vaultManager.grantLeaderboardRewards(event));
         safely("show damage leaderboard", () -> showDamageLeaderboard(event));
         checkEarlyCompletion(event.eventId());
@@ -1236,9 +1368,7 @@ public final class MeteorEventManager implements Listener {
                     && meteorEvent.playerDamageMap().containsKey(player.getUniqueId())) {
                 // Player still qualifies for rewards if they dealt damage before dying
                 // unless they died outside the event area
-                if (player.getWorld() == meteorEvent.center().getWorld()
-                        && player.getLocation().distance(meteorEvent.center())
-                        <= meteorEvent.meteorType().impactRadius() * 2) {
+                if (isInsideEvent(meteorEvent, player.getLocation(), 2.0)) {
                     event.setKeepInventory(true);
                     event.setKeepLevel(true);
                 }
@@ -1248,6 +1378,15 @@ public final class MeteorEventManager implements Listener {
     }
 
     // ---- Utility Methods ----
+
+    private boolean isInsideEvent(@NotNull ActiveMeteorEvent event,
+                                  @NotNull Location location, double multiplier) {
+        if (!location.getWorld().equals(event.world())) return false;
+        final double radius = configManager.getTypeConfig(event.meteorType()).impactRadius() * multiplier;
+        return configManager.getRadiusShape(event.meteorType()).contains(
+                location.getX() - event.center().getX(),
+                location.getZ() - event.center().getZ(), radius);
+    }
 
     private @Nullable World resolveWorld(@Nullable String worldName, CommandSender sender) {
         if (worldName != null) {

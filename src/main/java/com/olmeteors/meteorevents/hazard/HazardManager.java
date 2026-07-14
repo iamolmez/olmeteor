@@ -7,11 +7,9 @@ import com.olmeteors.meteorevents.event.EventPhase;
 import com.olmeteors.meteorevents.hook.WGHook;
 import com.olmeteors.meteorevents.scheduler.FoliaScheduler;
 import com.olmeteors.meteorevents.util.MessageUtil;
-import com.olmeteors.meteorevents.util.ParticleUtil;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
-import org.bukkit.World;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -39,7 +37,6 @@ public final class HazardManager implements Listener {
     private final MeteorPlugin plugin;
     private final ConfigManager configManager;
     private final WGHook wgHook;
-    private final ParticleUtil particleUtil;
 
     private final Map<String, ActiveMeteorEvent> hazardEvents;
 
@@ -55,7 +52,6 @@ public final class HazardManager implements Listener {
         this.plugin = plugin;
         this.configManager = plugin.getConfigManager();
         this.wgHook = wgHook;
-        this.particleUtil = new ParticleUtil(plugin);
         this.hazardEvents = new ConcurrentHashMap<>();
     }
 
@@ -112,8 +108,10 @@ public final class HazardManager implements Listener {
         if (!hazardEvents.containsKey(event.eventId()) || !player.isValid() || player.isDead()
                 || !player.getWorld().equals(event.world())) return;
         final Location playerLocation = player.getLocation();
-        final int radius = event.meteorType().impactRadius();
-        if (playerLocation.distanceSquared(event.center()) > (double) radius * radius) return;
+        final int radius = configManager.getTypeConfig(event.meteorType()).impactRadius();
+        if (!configManager.getRadiusShape(event.meteorType()).contains(
+                playerLocation.getX() - event.center().getX(),
+                playerLocation.getZ() - event.center().getZ(), radius)) return;
 
         if (!player.hasPermission("olmeteor.bypass.hazards")) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 40, 0,
@@ -148,109 +146,6 @@ public final class HazardManager implements Listener {
         }
     }
 
-    /**
-     * Applies radiation (Wither) damage to players within the hazard zone.
-     */
-    private void applyRadiationDamage(@NotNull World world, @NotNull Location center, int radius) {
-        final int damage = configManager.getRadiationDamagePerSecond();
-
-        for (final Player player : world.getNearbyPlayers(center, radius)) {
-            if (!player.isValid() || player.isDead()) continue;
-            if (player.hasPermission("olmeteor.bypass.hazards")) continue;
-
-            // Apply Wither effect (visual and damage)
-            player.addPotionEffect(new PotionEffect(
-                    PotionEffectType.WITHER,
-                    40, // 2 seconds
-                    0,
-                    true,
-                    true,
-                    true
-            ));
-
-            // Additional direct damage if Wither effect isn't enough
-            if (damage > 1) {
-                player.damage(damage);
-            }
-
-            // Visual radiation particles
-            final var playerLoc = player.getLocation();
-            particleUtil.spawnDustParticle(world,
-                    playerLoc.getX() + ThreadLocalRandom.current().nextDouble(-1, 1),
-                    playerLoc.getY() + ThreadLocalRandom.current().nextDouble(0, 2),
-                    playerLoc.getZ() + ThreadLocalRandom.current().nextDouble(-1, 1),
-                    0.3f, 1.0f, 0.1f, 0.8f
-            );
-
-            // Action bar warning (every second)
-            if (player.getTicksLived() % 20 == 0) {
-                MessageUtil.sendActionBar(player,
-                        msg("hazard.radiation.actionbar",
-                                "health", String.format("%.1f", player.getHealth())));
-            }
-        }
-    }
-
-    /**
-     * Triggers a wind charge wave that pushes players away from the center.
-     * Creates visual wind particle effects.
-     */
-    private void triggerWindChargeWave(@NotNull World world, @NotNull Location center, int radius) {
-        final double knockbackMultiplier = configManager.getWindChargeKnockbackMultiplier();
-
-        for (final Player player : world.getNearbyPlayers(center, radius)) {
-            if (!player.isValid() || player.isDead()) continue;
-
-            // Calculate knockback direction (away from center)
-            final Vector direction = player.getLocation().toVector()
-                    .subtract(center.toVector()).normalize();
-
-            // Apply vertical and horizontal knockback
-            final Vector velocity = direction.multiply(1.5 * knockbackMultiplier);
-            velocity.setY(0.5 * knockbackMultiplier);
-            player.setVelocity(velocity);
-
-            // Visual wind burst effect at player location
-            final var playerLoc = player.getLocation();
-            particleUtil.spawnExplosionEffect(world, playerLoc, 1.0f);
-
-            MessageUtil.sendActionBar(player,
-                    msg("hazard.wind.actionbar"));
-        }
-
-        // Visual ring expanding from center
-        particleUtil.spawnShockwaveRing(world, center, 1, radius, 1.0);
-    }
-
-    /**
-     * Checks and enforces EMP field effects (Elytra disable, Ender Pearl block).
-     */
-    private void checkEMPEffects(@NotNull World world, @NotNull Location center, int radius) {
-        if (!configManager.isElytraDisabled() && !configManager.isEnderPearlDisabled()) return;
-
-        for (final Player player : world.getNearbyPlayers(center, radius)) {
-            if (!player.isValid() || player.isDead()) continue;
-
-            // Disable Elytra flight
-            if (configManager.isElytraDisabled() && player.isGliding()) {
-                player.setGliding(false);
-                MessageUtil.sendMessage(player,
-                        msg("hazard.emp.elytra"));
-            }
-
-            // Visual EMP particles around player
-            final var playerLoc = player.getLocation();
-            for (int i = 0; i < 3; i++) {
-                particleUtil.spawnDustParticle(world,
-                        playerLoc.getX() + ThreadLocalRandom.current().nextDouble(-2, 2),
-                        playerLoc.getY() + ThreadLocalRandom.current().nextDouble(0, 3),
-                        playerLoc.getZ() + ThreadLocalRandom.current().nextDouble(-2, 2),
-                        0.2f, 0.5f, 1.0f, 1.5f
-                );
-            }
-        }
-    }
-
     // ---- Event Handlers ----
 
     @EventHandler
@@ -263,8 +158,7 @@ public final class HazardManager implements Listener {
             if (!hazardEvent.world().equals(player.getWorld())) continue;
             if (!hazardEvent.phase().hazardsEnabled()) continue;
 
-            final double distance = player.getLocation().distance(hazardEvent.center());
-            if (distance <= hazardEvent.meteorType().impactRadius()) {
+            if (contains(hazardEvent, player.getLocation())) {
                 // Block Elytra usage within zone
                 event.setCancelled(true);
                 MessageUtil.sendMessage(player,
@@ -289,8 +183,7 @@ public final class HazardManager implements Listener {
             final Location to = event.getTo();
             if (to == null) continue;
 
-            final double distanceTo = to.distance(hazardEvent.center());
-            if (distanceTo <= hazardEvent.meteorType().impactRadius()) {
+            if (contains(hazardEvent, to)) {
                 // Block Ender Pearl into the zone
                 event.setCancelled(true);
                 MessageUtil.sendMessage(player,
@@ -311,11 +204,18 @@ public final class HazardManager implements Listener {
             if (!hazardEvent.world().equals(location.getWorld())) continue;
             if (!hazardEvent.phase().hazardsEnabled()) continue;
 
-            final double distance = location.distance(hazardEvent.center());
-            if (distance <= hazardEvent.meteorType().impactRadius()) {
+            if (contains(hazardEvent, location)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean contains(@NotNull ActiveMeteorEvent event, @NotNull Location location) {
+        if (!event.world().equals(location.getWorld())) return false;
+        return configManager.getRadiusShape(event.meteorType()).contains(
+                location.getX() - event.center().getX(),
+                location.getZ() - event.center().getZ(),
+                configManager.getTypeConfig(event.meteorType()).impactRadius());
     }
 }

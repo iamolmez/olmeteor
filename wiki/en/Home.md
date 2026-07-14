@@ -2,7 +2,7 @@
 
 OlMeteor is a fully customizable meteor event plugin for Paper and Folia servers. It combines schematic-based impact zones, animated falling, wave-based mob systems, personal loot, damage ranking, automatic events, and safe terrain restoration in a single package.
 
-> This documentation is prepared for **OlMeteor 1.3.0** and **Paper/Folia 1.21.1+**. The server must use **Java 21**.
+> This documentation is prepared for **OlMeteor 1.4.0** and **Paper/Folia 1.21.1+**. The server must use **Java 21**.
 
 ---
 

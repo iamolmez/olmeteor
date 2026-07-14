@@ -35,6 +35,23 @@ When `locale-config-overrides: false`, the `lang/messages_en.yml` file is used. 
 
 ---
 
+## Automatic Search Area
+
+```yaml
+automatic-events:
+  min-distance-from-spawn: 100
+  max-distance-from-spawn: 500000
+  search-shape: "TRIANGLE"
+```
+
+The search shape is centered on the world spawn and is used only when choosing
+automatic meteor coordinates. Supported values are `CIRCLE`, `SQUARE`,
+`TRIANGLE`, `DIAMOND` and `HEXAGON`. A world can override the global value with
+`world-settings.<world>.search-shape`. The same option is available in the
+`/olmeteor auto` inventory.
+
+---
+
 ## Wave System
 
 ```yaml
@@ -123,11 +140,16 @@ meteor-types:
     restore-structure-on-finish: true
     fall-mode: "normal"
     impact-radius: 15
+    radius-shape: "CIRCLE"
     pre-impact-duration-seconds: 30
     event-duration-seconds: 300
     rollback-duration-seconds: 30
     boss-health-multiplier: 1.0
 ```
+
+`radius-shape` controls the horizontal event area used by location validation,
+hazards, damage, participation and preview. Supported values are `CIRCLE`,
+`SQUARE`, `TRIANGLE`, `DIAMOND` and `HEXAGON`.
 
 ### Loot Settings
 ```yaml

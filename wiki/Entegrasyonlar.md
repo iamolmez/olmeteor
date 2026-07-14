@@ -92,7 +92,7 @@ ranking-rewards:
 Ornek cikti:
 ```
 === OlMeteor Debug ===
-Plugin: OlMeteor 1.3.0
+Plugin: OlMeteor 1.4.0
 Sunucu: Paper 1.21.3
 
 Entegrasyonlar:

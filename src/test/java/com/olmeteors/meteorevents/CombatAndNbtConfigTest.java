@@ -31,6 +31,8 @@ final class CombatAndNbtConfigTest {
             assertTrue(config.contains(base + "combat-feedback.damage-actionbar"), type.name());
             assertTrue(config.contains(base + "combat-feedback.kill-actionbar"), type.name());
             assertTrue(config.contains(base + "combat-feedback.broadcast-leaderboard"), type.name());
+            assertTrue(config.getString(base + "radius-shape", "")
+                    .matches("CIRCLE|SQUARE|TRIANGLE|DIAMOND|HEXAGON"), type.name());
         }
     }
 
@@ -43,5 +45,7 @@ final class CombatAndNbtConfigTest {
         assertTrue(config.contains("integrations.nbt-api.enabled"));
         assertTrue(config.contains("event.combat-feedback.damage-actionbar-text"));
         assertTrue(config.contains("event.combat-feedback.leaderboard-entry"));
+        assertTrue(config.getString("automatic-events.search-shape", "")
+                .matches("CIRCLE|SQUARE|TRIANGLE|DIAMOND|HEXAGON"));
     }
 }

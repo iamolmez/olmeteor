@@ -39,6 +39,7 @@ messages:
       invalid_type: "&cGeçersiz meteor tipi: &e%type%"
       scheduled: "&aMeteor etkinliği &e%eventId% &aşu konumda planlandı: &e%location%"
       error: "&cEtkinlik başlatılırken bir hata oluştu: %error%"
+      fawe_required: "&cMeteor başlatılamadı: güvenli schematic ve arazi geri yükleme için FAWE yüklü ve etkin olmalıdır."
       location_fail: "&cMeteor etkinliği için uygun bir konum bulunamadı. Farklı bir dünya veya tip deneyin."
       world_not_found: "&c'%world%' dünyası bulunamadı."
 
@@ -66,6 +67,7 @@ messages:
       world: "&7Dünya: &f%world%"
       location: "&7Konum: &f%location%"
       radius: "&7Yarıçap: &f%radius% blok"
+      radius_shape: "&7Alan şekli: &f%shape%"
       schematic: "&7Şematik: &f%schematic%"
       distance: "&7&e%player%&7 mesafesi: &f%distance% blok"
 

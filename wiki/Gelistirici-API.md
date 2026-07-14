@@ -11,7 +11,7 @@ OlMeteor henuz bir Maven deposunda yayinlanmiyorsa JAR'i projenizin libs/ klasor
 ### build.gradle.kts:
 ```kotlin
 dependencies {
-    compileOnly(files("libs/OlMeteor-1.3.0.jar"))
+    compileOnly(files("libs/OlMeteor-1.4.0.jar"))
 }
 ```
 

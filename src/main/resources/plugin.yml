@@ -21,7 +21,7 @@ depend:
 # unless the corresponding feature becomes mandatory for the whole plugin.
 softdepend:
   - FastAsyncWorldEdit # Async schematic pasting + terrain rollback
-  - WorldEdit          # Compatibility fallback when FAWE is not installed
+  - WorldEdit          # FAWE's API/load-order dependency; not used as an unsafe async fallback
   - WorldGuard         # Dynamic event region protection
   - Towny              # Claim conflict detection
   - MythicMobs         # Custom boss mechanics

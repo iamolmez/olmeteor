@@ -4,7 +4,26 @@ Bu sayfa OlMeteor'un guncel ve gecmis surumlerindeki degisiklikleri icerir.
 
 ---
 
-## Surum 1.3.0 (Guncel)
+## Surum 1.4.0 (Guncel)
+
+**Yayinlanma:** 2026 | **Gereken Java:** 21 | **Sunucu:** Paper/Folia 1.21.1+
+
+### Eklenenler ve Duzeltmeler
+
+- Meteor tipi bazinda `CIRCLE`, `SQUARE`, `TRIANGLE`, `DIAMOND`, `HEXAGON` radius sekilleri
+- Sekilli hazard, katilim, olum/odul alani ve arazi uygunluk kontrolu
+- `/olmeteor preview` icinde gercek radius sekli onizlemesi
+- Chunk snapshot tabanli Folia-safe otomatik konum arama
+- Hazard, setup ve display animasyonlarinda entity/region scheduler duzeltmeleri
+- Meteor display task sizintisi duzeltmesi
+- Basarisiz veya iptal edilen meteor biletinin otomatik iadesi
+- Cevrimdisi oyuncu icin sonraki giriste bilet iadesi
+- Lifecycle eventlerinin konum region'inda calismasi
+- Gradle ve Mockito test bakim uyarilarinin temizlenmesi
+
+---
+
+## Surum 1.3.0
 
 **Yayinlanma:** 2024 | **Gereken Java:** 21 | **Sunucu:** Paper/Folia 1.21.1+
 

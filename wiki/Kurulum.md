@@ -30,7 +30,7 @@
 ### 2. Dosyalari Yerlestirme
 ```
 plugins/
-  OlMeteor-1.3.0.jar       -- Ana eklenti
+  OlMeteor-1.4.0.jar       -- Ana eklenti
   CommandAPI-*.jar           -- Zorunlu bagimlilik
   FastAsyncWorldEdit-*.jar   -- Onerilen (schematic islemleri)
   WorldGuard-*.jar           -- Istege bagli

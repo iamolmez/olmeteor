@@ -61,4 +61,4 @@ OlMeteor is a fully customizable meteor event plugin for Paper and Folia servers
 
 ---
 
-> **OlMeteor 1.3.0** | Paper/Folia 1.21.1+ | Java 21
+> **OlMeteor 1.4.0** | Paper/Folia 1.21.1+ | Java 21

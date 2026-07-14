@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.olmeteors"
-version = "1.3.0"
+version = "1.4.0"
 description = "OlMeteor event plugin for Paper/Folia 1.21.1+"
 
 val pluginName = rootProject.name

@@ -4,12 +4,55 @@ import com.olmeteors.meteorevents.MeteorPlugin;
 import com.olmeteors.meteorevents.event.ActiveMeteorEvent;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
+
+/** Classloader-safe facade for the optional PlaceholderAPI expansion. */
+public final class PlaceholderAPIHook {
+    private final Access access;
+
+    private PlaceholderAPIHook(Access access) {
+        this.access = Objects.requireNonNull(access, "access");
+    }
+
+    public static @NotNull PlaceholderAPIHook create(@NotNull MeteorPlugin plugin,
+                                                       @Nullable Plugin placeholderPlugin) {
+        if (placeholderPlugin == null || !placeholderPlugin.isEnabled()) {
+            plugin.getLogger().info("PlaceholderAPI not installed or enabled - placeholders disabled");
+            return new PlaceholderAPIHook(DisabledAccess.INSTANCE);
+        }
+        try {
+            final ClassLoader loader = placeholderPlugin.getClass().getClassLoader();
+            Class.forName("me.clip.placeholderapi.PlaceholderAPI", false, loader);
+            Class.forName("me.clip.placeholderapi.expansion.PlaceholderExpansion", false, loader);
+            return new PlaceholderAPIHook(new PlaceholderAPIAccess(plugin));
+        } catch (ClassNotFoundException | LinkageError | RuntimeException error) {
+            plugin.getLogger().log(Level.WARNING,
+                    "PlaceholderAPI is missing or incompatible - placeholders disabled safely", error);
+            return new PlaceholderAPIHook(DisabledAccess.INSTANCE);
+        }
+    }
+
+    public boolean isAvailable() { return access.isAvailable(); }
+    public void shutdown() { access.shutdown(); }
+
+    interface Access {
+        boolean isAvailable();
+        void shutdown();
+    }
+
+    private enum DisabledAccess implements Access {
+        INSTANCE;
+        @Override public boolean isAvailable() { return false; }
+        @Override public void shutdown() { }
+    }
+}
 
 /**
  * Hook for PlaceholderAPI integration.
@@ -17,34 +60,17 @@ import java.util.logging.Level;
  * - %olmeteor_active% - Number of active events
  * - %olmeteor_eventid% - ID of nearest event to player
  */
-public final class PlaceholderAPIHook {
+final class PlaceholderAPIAccess implements PlaceholderAPIHook.Access {
 
     private final MeteorPlugin plugin;
     private boolean available;
     private MeteorExpansion expansion;
 
-    public PlaceholderAPIHook(MeteorPlugin plugin) {
+    PlaceholderAPIAccess(MeteorPlugin plugin) {
         this.plugin = plugin;
-        checkAvailability();
-    }
-
-    private void checkAvailability() {
-        final var placeholderApi = plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI");
-        if (placeholderApi == null || !placeholderApi.isEnabled()) {
-            this.available = false;
-            plugin.getLogger().info("PlaceholderAPI not installed or enabled - placeholders disabled");
-            return;
-        }
-
-        try {
-            Class.forName("me.clip.placeholderapi.PlaceholderAPI");
-            this.available = true;
-            registerExpansion();
+        this.available = registerExpansion();
+        if (this.available) {
             plugin.getLogger().info("PlaceholderAPI hook initialized successfully");
-        } catch (ClassNotFoundException | LinkageError | RuntimeException error) {
-            this.available = false;
-            plugin.getLogger().log(Level.WARNING,
-                    "PlaceholderAPI is missing or incompatible - placeholders disabled", error);
         }
     }
 
@@ -52,13 +78,28 @@ public final class PlaceholderAPIHook {
         return available;
     }
 
-    private void registerExpansion() {
+    private boolean registerExpansion() {
         this.expansion = new MeteorExpansion(plugin);
         if (expansion.register()) {
             plugin.getLogger().info("PlaceholderAPI expansion registered: olmeteor");
+            return true;
         } else {
             plugin.getLogger().warning("Failed to register PlaceholderAPI expansion");
+            return false;
         }
+    }
+
+    @Override
+    public void shutdown() {
+        if (expansion != null) {
+            try {
+                expansion.unregister();
+            } catch (RuntimeException | LinkageError error) {
+                plugin.getLogger().log(Level.FINE,
+                        "Could not unregister PlaceholderAPI expansion", error);
+            }
+        }
+        available = false;
     }
 
     /**

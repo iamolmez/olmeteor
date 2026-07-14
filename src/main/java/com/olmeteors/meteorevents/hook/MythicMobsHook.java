@@ -5,44 +5,89 @@ import com.olmeteors.meteorevents.event.MeteorType;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.logging.Level;
 import java.util.List;
+import java.util.Objects;
+
+/** Classloader-safe Bukkit-only facade for the optional MythicMobs API. */
+public final class MythicMobsHook {
+    private static final String[] REQUIRED_CLASSES = {
+            "io.lumine.mythic.bukkit.MythicBukkit",
+            "io.lumine.mythic.api.mobs.MythicMob"
+    };
+    private final Access access;
+
+    private MythicMobsHook(Access access) {
+        this.access = Objects.requireNonNull(access, "access");
+    }
+
+    public static @NotNull MythicMobsHook create(@NotNull MeteorPlugin plugin,
+                                                  @Nullable Plugin mythicPlugin) {
+        if (mythicPlugin == null || !mythicPlugin.isEnabled()) {
+            plugin.getLogger().info("MythicMobs not installed or enabled - custom mobs disabled");
+            return new MythicMobsHook(DisabledAccess.INSTANCE);
+        }
+        try {
+            final ClassLoader loader = mythicPlugin.getClass().getClassLoader();
+            for (final String className : REQUIRED_CLASSES) {
+                Class.forName(className, false, loader);
+            }
+            final MythicMobsHook hook = new MythicMobsHook(new MythicMobsAccess(plugin));
+            plugin.getLogger().info("MythicMobs hook initialized successfully");
+            return hook;
+        } catch (ClassNotFoundException | LinkageError | RuntimeException error) {
+            plugin.getLogger().log(Level.WARNING,
+                    "MythicMobs API is missing or incompatible - custom mobs disabled safely", error);
+            return new MythicMobsHook(DisabledAccess.INSTANCE);
+        }
+    }
+
+    public boolean isAvailable() { return access.isAvailable(); }
+    public @NotNull List<String> getMobIds() { return access.getMobIds(); }
+    public @Nullable Entity spawnMob(String id, Location location) {
+        return access.spawnMob(id, location);
+    }
+    public @Nullable Entity spawnBoss(String id, Location location, double multiplier) {
+        return access.spawnBoss(id, location, multiplier);
+    }
+    public @Nullable Entity spawnMinion(Location location, MeteorType type) {
+        return access.spawnMinion(location, type);
+    }
+
+    interface Access {
+        boolean isAvailable();
+        List<String> getMobIds();
+        Entity spawnMob(String id, Location location);
+        Entity spawnBoss(String id, Location location, double multiplier);
+        Entity spawnMinion(Location location, MeteorType type);
+    }
+
+    private enum DisabledAccess implements Access {
+        INSTANCE;
+        @Override public boolean isAvailable() { return false; }
+        @Override public List<String> getMobIds() { return List.of(); }
+        @Override public Entity spawnMob(String id, Location location) { return null; }
+        @Override public Entity spawnBoss(String id, Location location, double multiplier) { return null; }
+        @Override public Entity spawnMinion(Location location, MeteorType type) { return null; }
+    }
+}
 
 /**
  * Hook for MythicMobs integration providing custom boss and minion spawning
  * mechanics for meteor events.
  */
-public final class MythicMobsHook {
+final class MythicMobsAccess implements MythicMobsHook.Access {
 
     private final MeteorPlugin plugin;
     private boolean available;
 
-    public MythicMobsHook(MeteorPlugin plugin) {
+    MythicMobsAccess(MeteorPlugin plugin) {
         this.plugin = plugin;
-        checkAvailability();
-    }
-
-    private void checkAvailability() {
-        final var mythicMobs = plugin.getServer().getPluginManager().getPlugin("MythicMobs");
-        if (mythicMobs == null || !mythicMobs.isEnabled()) {
-            this.available = false;
-            plugin.getLogger().info("MythicMobs not installed or enabled - standard mobs will be used");
-            return;
-        }
-
-        try {
-            Class.forName("io.lumine.mythic.bukkit.MythicBukkit");
-            Class.forName("io.lumine.mythic.api.mobs.MythicMob");
-            this.available = true;
-            plugin.getLogger().info("MythicMobs hook initialized successfully");
-        } catch (ClassNotFoundException | LinkageError error) {
-            this.available = false;
-            plugin.getLogger().log(Level.WARNING,
-                    "MythicMobs API is missing or incompatible - standard mobs will be used", error);
-        }
+        this.available = true;
     }
 
     public boolean isAvailable() {

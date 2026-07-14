@@ -35,6 +35,24 @@ locale-config-overrides: false
 
 ---
 
+## Auto Arama Alani
+
+```yaml
+automatic-events:
+  min-distance-from-spawn: 100
+  max-distance-from-spawn: 500000
+  search-shape: "TRIANGLE"
+```
+
+`search-shape`, dunya spawnini merkez alarak otomatik meteorun aranacagi yatay
+bolgeyi belirler. Desteklenen degerler `CIRCLE`, `SQUARE`, `TRIANGLE`, `DIAMOND`
+ve `HEXAGON`'dur. Ornekte meteor, spawn merkezinden 100 ile 500.000 blok
+arasindaki ucgen alan icinde aranir. `world-settings.<dunya>.search-shape` ile
+her dunya icin farkli sekil secilebilir. Oyun icinde `/olmeteor auto` menusundeki
+**Arama sekli** dugmesi ayni ayari kaydeder.
+
+---
+
 ## Dalga Sistemi
 
 ```yaml
@@ -248,6 +266,23 @@ Ayri bir `command-categories.yml` dosyasindan yardim kategorileri okunur. Her ka
 - `enabled: false` ile gizlenebilir
 - `title` ile baslik metni belirlenir
 - `commands` ile gosterilecek komutlar listelenir
+
+---
+
+## Radius Sekli
+
+Her meteor tipi icin etki alani sekli secilebilir:
+
+```yaml
+meteor-types:
+  epic:
+    impact-radius: 60
+    radius-shape: "TRIANGLE"
+```
+
+Desteklenen degerler: `CIRCLE`, `SQUARE`, `TRIANGLE`, `DIAMOND`, `HEXAGON`.
+Secilen sekil hazard, katilimci algilama, olum/odul alani, arazi taramasi ve
+`/olmeteor preview` sinirinda kullanilir.
 
 ---
 

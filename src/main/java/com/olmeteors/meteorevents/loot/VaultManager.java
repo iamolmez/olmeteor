@@ -11,6 +11,7 @@ import com.olmeteors.meteorevents.util.MessageUtil;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.block.TrialSpawner;
@@ -29,6 +30,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -56,7 +58,9 @@ public final class VaultManager implements Listener {
 
     private final Map<String, List<VaultData>> eventVaults;
     private final Map<String, Set<UUID>> rankingRewardsGranted = new ConcurrentHashMap<>();
+    private final Set<String> keysDistributedEvents = ConcurrentHashMap.newKeySet();
     private final Map<LootSessionKey, Inventory> personalLoot = new ConcurrentHashMap<>();
+    private final NamespacedKey meteorVaultKey;
 
     // ── Config-based message helper ────────────────────────────
     private void tell(Player player, String path, String... placeholders) {
@@ -69,6 +73,7 @@ public final class VaultManager implements Listener {
         this.displayEntityManager = displayEntityManager;
         this.mythicMobsHook = mythicMobsHook;
         this.eventVaults = new ConcurrentHashMap<>();
+        this.meteorVaultKey = new NamespacedKey(plugin, "meteor_vault_key");
     }
 
     /**
@@ -84,9 +89,18 @@ public final class VaultManager implements Listener {
             final List<org.bukkit.util.Vector> actualOffsets = chestOffsets.isEmpty()
                     ? List.of(new org.bukkit.util.Vector(0, 1, 0)) : chestOffsets;
             final List<VaultData> vaults = new CopyOnWriteArrayList<>();
+            final Set<String> occupiedLocations = ConcurrentHashMap.newKeySet();
             eventVaults.put(event.eventId(), vaults);
             for (final org.bukkit.util.Vector offset : actualOffsets) {
                 final Location vaultLoc = center.clone().add(offset).toBlockLocation();
+                final String locationKey = vaultLoc.getWorld().getUID() + ":"
+                        + vaultLoc.getBlockX() + ":" + vaultLoc.getBlockY() + ":"
+                        + vaultLoc.getBlockZ();
+                if (!occupiedLocations.add(locationKey)) {
+                    plugin.getLogger().warning("Duplicate reward block position ignored for event "
+                            + event.eventId() + ": " + formatLocation(vaultLoc));
+                    continue;
+                }
                 plugin.getFoliaScheduler().runAtLocation(vaultLoc, () -> {
                     try {
                         // The event may have finished while this region task was queued.
@@ -132,6 +146,7 @@ public final class VaultManager implements Listener {
     public void removeVault(@NotNull String eventId) {
         final List<VaultData> vaults = eventVaults.remove(eventId);
         rankingRewardsGranted.remove(eventId);
+        keysDistributedEvents.remove(eventId);
         personalLoot.entrySet().stream().filter(entry -> entry.getKey().eventId().equals(eventId))
                 .map(Map.Entry::getValue).distinct().forEach(inventory ->
                         List.copyOf(inventory.getViewers()).forEach(viewer -> {
@@ -153,6 +168,7 @@ public final class VaultManager implements Listener {
      * @param event the meteor event
      */
     public void distributeKeys(@NotNull ActiveMeteorEvent event) {
+        if (!keysDistributedEvents.add(event.eventId())) return;
         final double damageThreshold = plugin.getConfigManager().getBossDamageThreshold();
 
         // The boss is dead, so the vault must never remain permanently locked.
@@ -181,13 +197,20 @@ public final class VaultManager implements Listener {
             if (contribution >= threshold) {
                 final Player player = plugin.getServer().getPlayer(entry.getKey());
                 if (player != null && player.isOnline()) {
-                    final ItemStack key = DataComponentUtil.createMeteorKey(
-                            plugin.getConfigManager(),
-                            plugin.getConfigManager().getMeteorTypeName(event.meteorType()));
-                    player.getInventory().addItem(key);
-
-                    tell(player, "vault.key_received",
-                            "damage", String.format("%.1f", contribution));
+                    plugin.getFoliaScheduler().runForEntity(player, () -> {
+                        if (!player.isOnline()) return;
+                        final ItemStack key = DataComponentUtil.createMeteorKey(
+                                plugin.getConfigManager(),
+                                plugin.getConfigManager().getMeteorTypeName(event.meteorType()));
+                        final var keyMeta = key.getItemMeta();
+                        keyMeta.getPersistentDataContainer().set(meteorVaultKey,
+                                PersistentDataType.STRING, event.eventId());
+                        key.setItemMeta(keyMeta);
+                        player.getInventory().addItem(key).values().forEach(item ->
+                                player.getWorld().dropItemNaturally(player.getLocation(), item));
+                        tell(player, "vault.key_received",
+                                "damage", String.format(Locale.ROOT, "%.1f", contribution));
+                    });
                     keysDistributed++;
                 }
             }
@@ -326,7 +349,7 @@ public final class VaultManager implements Listener {
         // Generate and give loot items
         final var lootTable = plugin.getLootGUIEditor().getLootTable(meteorEvent.meteorType());
         if (lootTable != null) {
-            final var rewards = lootTable.generateLoot();
+            final var rewards = lootTable.generateLoot(hasMeteorKey(player, meteorEvent.eventId()));
             final int size = Math.min(54, Math.max(9,
                     ((Math.min(rewards.size(), 54) + 8) / 9) * 9));
             final LootSessionKey key = LootSessionKey.of(vaultData,
@@ -416,6 +439,13 @@ public final class VaultManager implements Listener {
 
     private void grantRankingRewards(@NotNull Player player,
                                      @NotNull ActiveMeteorEvent meteorEvent) {
+        plugin.getFoliaScheduler().runForEntity(player,
+                () -> grantRankingRewardsOnEntityThread(player, meteorEvent));
+    }
+
+    private void grantRankingRewardsOnEntityThread(@NotNull Player player,
+                                                    @NotNull ActiveMeteorEvent meteorEvent) {
+        if (!player.isOnline()) return;
         final Set<UUID> granted = rankingRewardsGranted.computeIfAbsent(
                 meteorEvent.eventId(), ignored -> ConcurrentHashMap.newKeySet());
         if (!granted.add(player.getUniqueId())) return;
@@ -448,21 +478,30 @@ public final class VaultManager implements Listener {
                     .dropItemNaturally(player.getLocation(), item));
         }
 
-        for (final String command : plugin.getConfigManager()
-                .getRankingRewardCommands(meteorEvent.meteorType(), rank)) {
+        final List<String> commands = plugin.getConfigManager()
+                .getRankingRewardCommands(meteorEvent.meteorType(), rank).stream().map(command -> {
             String parsed = command
                     .replace("%player%", player.getName())
                     .replace("%rank%", String.valueOf(rank))
                     .replace("%damage%", String.format(Locale.ROOT, "%.1f", damage));
-            parsed = normalizeRewardCommand(parsed);
-            try {
-                if (!plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), parsed)) {
-                    plugin.getLogger().warning("Ranking reward command was not recognized: " + parsed);
+            return normalizeRewardCommand(parsed);
+        }).toList();
+        if (!commands.isEmpty()) {
+            plugin.getFoliaScheduler().callGlobal(() -> {
+                for (final String parsed : commands) {
+                    try {
+                        if (!plugin.getServer().dispatchCommand(
+                                plugin.getServer().getConsoleSender(), parsed)) {
+                            plugin.getLogger().warning(
+                                    "Ranking reward command was not recognized: " + parsed);
+                        }
+                    } catch (RuntimeException error) {
+                        plugin.getLogger().log(Level.WARNING,
+                                "Ranking reward command failed without blocking other rewards: "
+                                        + parsed, error);
+                    }
                 }
-            } catch (RuntimeException error) {
-                plugin.getLogger().log(Level.WARNING,
-                        "Ranking reward command failed without blocking other rewards: " + parsed, error);
-            }
+            });
         }
         tell(player, "vault.ranking_reward", "rank", String.valueOf(rank));
         plugin.getPlayerStatsStore().addRankingReward(player.getUniqueId());
@@ -500,11 +539,18 @@ public final class VaultManager implements Listener {
     /**
      * Checks if an item is a Meteor Key.
      */
-    private boolean isMeteorKey(@NotNull ItemStack item) {
+    private boolean isMeteorKey(@NotNull ItemStack item, @NotNull String eventId) {
         if (item.getType() != Material.TRIAL_KEY) return false;
         if (!item.hasItemMeta()) return false;
         final var meta = item.getItemMeta();
-        return meta.hasCustomModelData() && meta.getCustomModelData() == 1001;
+        return eventId.equals(meta.getPersistentDataContainer().get(
+                meteorVaultKey, PersistentDataType.STRING));
+    }
+
+    private boolean hasMeteorKey(@NotNull Player player, @NotNull String eventId) {
+        return java.util.Arrays.stream(player.getInventory().getStorageContents())
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(item -> isMeteorKey(item, eventId));
     }
 
     private int damageRank(@NotNull ActiveMeteorEvent event, @NotNull UUID playerId) {

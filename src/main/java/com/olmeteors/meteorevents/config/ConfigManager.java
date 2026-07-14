@@ -3,6 +3,7 @@ package com.olmeteors.meteorevents.config;
 import com.olmeteors.meteorevents.MeteorPlugin;
 import com.olmeteors.meteorevents.event.MeteorType;
 import com.olmeteors.meteorevents.event.MeteorFallMode;
+import com.olmeteors.meteorevents.event.RadiusShape;
 import com.olmeteors.meteorevents.util.MessageUtil;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
@@ -465,6 +466,12 @@ public final class ConfigManager {
             + type.name().toLowerCase(Locale.ROOT) + ".waves.interval-seconds",
             config.getInt("event.waves.interval-seconds", 15))); }
 
+    public @NotNull com.olmeteors.meteorevents.event.RadiusShape getRadiusShape(
+            @NotNull MeteorType type) {
+        return com.olmeteors.meteorevents.event.RadiusShape.parse(config.getString("meteor-types."
+                + type.name().toLowerCase(Locale.ROOT) + ".radius-shape", "CIRCLE"));
+    }
+
     public boolean isImpactCoreEnabled() {
         return config.getBoolean("event.fall.show-impact-core", false);
     }
@@ -636,6 +643,16 @@ public final class ConfigManager {
                                     int minMinutes, int maxMinutes,
                                     int minDistance, int maxDistance,
                                     @Nullable Integer minY, @Nullable Integer maxY) {
+        return setAutomaticRule(types, worldName, preset, lootBlocks, minMinutes, maxMinutes,
+                minDistance, maxDistance, minY, maxY, getAutomaticSearchShape(worldName));
+    }
+
+    public boolean setAutomaticRule(@NotNull List<MeteorType> types, @NotNull String worldName,
+                                    @NotNull String preset, @NotNull List<Material> lootBlocks,
+                                    int minMinutes, int maxMinutes,
+                                    int minDistance, int maxDistance,
+                                    @Nullable Integer minY, @Nullable Integer maxY,
+                                    @NotNull RadiusShape searchShape) {
         final String normalized = preset.toLowerCase(Locale.ROOT).replace('-', '_');
         if (!config.isConfigurationSection("location-finder.presets." + normalized)
                 || minMinutes < 1 || maxMinutes < minMinutes
@@ -666,6 +683,7 @@ public final class ConfigManager {
         config.set(base + "enabled", true);
         config.set(base + "weight", 1);
         config.set(base + "preset", normalized);
+        config.set(base + "search-shape", searchShape.name());
         config.set(base + "min-y", minY);
         config.set(base + "max-y", maxY);
         return saveConfigFile("complete automatic event rule");
@@ -699,6 +717,12 @@ public final class ConfigManager {
     public int getAutomaticMaxDistance() {
         return Math.max(getAutomaticMinDistance() + 1,
                 config.getInt("automatic-events.max-distance-from-spawn", getMaxEventDistance()));
+    }
+
+    public @NotNull RadiusShape getAutomaticSearchShape(@NotNull String worldName) {
+        return RadiusShape.parse(config.getString(
+                "automatic-events.world-settings." + worldName + ".search-shape",
+                config.getString("automatic-events.search-shape", "CIRCLE")));
     }
 
     public @NotNull List<String> getRankingRewardItems(@NotNull MeteorType type, int rank) {

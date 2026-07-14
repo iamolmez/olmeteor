@@ -2,7 +2,6 @@ package com.olmeteors.meteorevents.rollback;
 
 import com.olmeteors.meteorevents.MeteorPlugin;
 import com.olmeteors.meteorevents.hook.FAWEHook;
-import com.sk89q.worldedit.extent.clipboard.Clipboard;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
@@ -86,7 +85,7 @@ public final class RollbackSystem {
 
     private boolean captureBounds(@NotNull String eventId, @NotNull World world,
                                   @NotNull Location min, @NotNull Location max) {
-        final Clipboard clipboard = faweHook.captureTerrain(world, min, max);
+        final Object clipboard = faweHook.captureTerrain(world, min, max);
         if (clipboard == null) {
             return false;
         }
@@ -99,7 +98,7 @@ public final class RollbackSystem {
         return true;
     }
 
-    private boolean persistSnapshot(String eventId, Clipboard clipboard, World world, Location minimum) {
+    private boolean persistSnapshot(String eventId, Object clipboard, World world, Location minimum) {
         final File schematic = new File(recoveryDirectory, eventId + ".schem");
         if (!faweHook.writeRecoveryClipboard(clipboard, schematic)) return false;
         final YamlConfiguration metadata = new YamlConfiguration();
@@ -155,7 +154,7 @@ public final class RollbackSystem {
                 final World world = plugin.getServer().getWorld(metadata.getString("world", ""));
                 if (eventId == null || world == null) continue;
                 final File schematic = new File(recoveryDirectory, eventId + ".schem");
-                final Clipboard clipboard = faweHook.readRecoveryClipboard(schematic);
+                final Object clipboard = faweHook.readRecoveryClipboard(schematic);
                 if (clipboard == null) continue;
                 final Location minimum = new Location(world, metadata.getInt("x"),
                         metadata.getInt("y"), metadata.getInt("z"));
@@ -186,141 +185,5 @@ public final class RollbackSystem {
         new File(recoveryDirectory, eventId + ".yml").delete();
     }
 
-    /**
-     * Rolls back an area by restoring terrain to its pre-event state.
-     * Operates asynchronously to prevent server lag.
-     *
-     * @param center the center of the area to roll back
-     * @param radius the radius of the affected area
-     * @return CompletableFuture that completes with true on success
-     */
-    public @NotNull CompletableFuture<Boolean> rollbackArea(@NotNull Location center, int radius) {
-        if (!faweHook.isAvailable()) {
-            plugin.getLogger().warning("FAWE not available. Cannot perform rollback.");
-            return CompletableFuture.completedFuture(false);
-        }
-
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                final World world = center.getWorld();
-                if (world == null) return false;
-
-                // Calculate the area bounds
-                final Location min = center.clone().add(-radius, -10, -radius);
-                final Location max = center.clone().add(radius, 20, radius);
-
-                // Capture the current terrain first
-                plugin.getLogger().info("Capturing terrain for rollback at: "
-                        + formatLocation(center));
-
-                // Since we can't easily do true rollback without a pre-captured snapshot,
-                // we use FAWE's undo capabilities and natural block restoration
-                final Clipboard currentTerrain = faweHook.captureTerrain(world, min, max);
-
-                if (currentTerrain == null) {
-                    plugin.getLogger().warning("Failed to capture terrain for rollback");
-                    return false;
-                }
-
-                // Restore the area using the captured terrain
-                // In a full implementation, we would paste the pre-event snapshot
-                // For now, we simply clear non-natural blocks and restore the area
-                restoreNaturalTerrain(world, center, radius);
-
-                plugin.getLogger().info("Rollback completed successfully at: "
-                        + formatLocation(center));
-                return true;
-
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.SEVERE,
-                        "Error during rollback at: " + formatLocation(center), e);
-                return false;
-            }
-        });
-    }
-
-    /**
-     * Restores natural terrain in the affected area.
-     * Removes event-placed blocks and restores natural ground cover.
-     *
-     * @param world  the world
-     * @param center the center location
-     * @param radius the radius
-     */
-    private void restoreNaturalTerrain(@NotNull World world, @NotNull Location center, int radius) {
-        try {
-            // Clear event-related blocks in the area
-            for (int x = -radius; x <= radius; x++) {
-                for (int z = -radius; z <= radius; z++) {
-                    for (int y = -5; y <= 10; y++) {
-                        final Location loc = center.clone().add(x, y, z);
-                        final var block = world.getBlockAt(loc);
-
-                        // Remove blocks that are not natural
-                        if (isEventBlock(block.getType())) {
-                            block.setType(org.bukkit.Material.AIR, false);
-                        }
-                    }
-                }
-            }
-
-            plugin.getLogger().info("Natural terrain restoration completed in radius: "
-                    + radius + " at " + formatLocation(center));
-
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING,
-                    "Error during natural terrain restoration", e);
-        }
-    }
-
-    /**
-     * Checks if a block type is an event-placed block that should be removed.
-     *
-     * @param material the block material
-     * @return true if it's an event block
-     */
-    private boolean isEventBlock(org.bukkit.Material material) {
-        // List of materials that are typically placed by events and should be removed
-        return switch (material) {
-            case VINE, GLOW_LICHEN, FIRE, SOUL_FIRE,
-                 CRIMSON_ROOTS, WARPED_ROOTS, NETHER_SPROUTS,
-                 SMALL_DRIPLEAF, BIG_DRIPLEAF, SPORE_BLOSSOM,
-                 MOSS_BLOCK, MOSS_CARPET,
-                 COBWEB, SWEET_BERRY_BUSH,
-                 SCULK, SCULK_VEIN, SCULK_CATALYST, SCULK_SHRIEKER,
-                 SCULK_SENSOR, CALIBRATED_SCULK_SENSOR
-                    -> true;
-            default -> false;
-        };
-    }
-
-    /**
-     * Schedules the cleanup of event items dropped on the ground.
-     *
-     * @param world  the world
-     * @param center the center location
-     * @param radius the radius
-     */
-    public void cleanupDroppedItems(@NotNull World world, @NotNull Location center, int radius) {
-        world.getNearbyEntities(center, radius, 10, radius).forEach(entity -> {
-            if (entity instanceof org.bukkit.entity.Item item) {
-                // Remove dropped items that are event-related
-                final var itemStack = item.getItemStack();
-                if (itemStack.hasItemMeta() && itemStack.getItemMeta().hasLore()) {
-                    final var lore = itemStack.getItemMeta().lore();
-                    if (lore != null && lore.stream().anyMatch(
-                            line -> line.toString().contains("Meteor"))) {
-                        item.remove();
-                    }
-                }
-            }
-        });
-    }
-
-    private String formatLocation(Location loc) {
-        return String.format("%.0f, %.0f, %.0f (%s)",
-                loc.getX(), loc.getY(), loc.getZ(), loc.getWorld().getName());
-    }
-
-    private record TerrainSnapshot(Clipboard clipboard, World world, Location minimumPoint) {}
+    private record TerrainSnapshot(Object clipboard, World world, Location minimumPoint) {}
 }

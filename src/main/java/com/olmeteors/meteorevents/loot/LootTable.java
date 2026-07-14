@@ -61,10 +61,16 @@ public final class LootTable {
      * @return a list of ItemStacks to give to the player
      */
     public @NotNull List<ItemStack> generateLoot() {
+        return generateLoot(true);
+    }
+
+    /** Generates loot while optionally excluding entries protected by a meteor key. */
+    public @NotNull List<ItemStack> generateLoot(boolean includeLocked) {
         final List<ItemStack> loot = new ArrayList<>();
 
         for (final LootEntry entry : entries) {
             try {
+                if (entry.locked() && !includeLocked) continue;
                 // Roll for this entry
                 final double roll = ThreadLocalRandom.current().nextDouble(0, 100);
 
@@ -79,12 +85,18 @@ public final class LootTable {
                     }
 
                     // Create the item stack
-                    final ItemStack item = entry.item().clone();
-                    item.setAmount(amount);
-                    loot.add(item);
+                    int remaining = amount;
+                    final int maxStack = Math.max(1, entry.item().getMaxStackSize());
+                    while (remaining > 0) {
+                        final ItemStack item = entry.item().clone();
+                        final int stackAmount = Math.min(maxStack, remaining);
+                        item.setAmount(stackAmount);
+                        loot.add(item);
+                        remaining -= stackAmount;
+                    }
                 }
-            } catch (Exception e) {
-                // Skip invalid entries silently
+            } catch (RuntimeException ignored) {
+                // A malformed external item entry cannot block the rest of the table.
             }
         }
 

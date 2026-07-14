@@ -2,6 +2,7 @@ package com.olmeteors.meteorevents.gui;
 
 import com.olmeteors.meteorevents.MeteorPlugin;
 import com.olmeteors.meteorevents.event.MeteorType;
+import com.olmeteors.meteorevents.event.RadiusShape;
 import com.olmeteors.meteorevents.util.MessageUtil;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -44,7 +45,7 @@ public final class AutoSetupGUI implements Listener {
                 config.getLootBlockMaterial(types.isEmpty() ? MeteorType.SMALL : types.iterator().next()),
                 config.getAutomaticMinMinutes(), config.getAutomaticMaxMinutes(),
                 config.getAutomaticMinDistance(), config.getAutomaticMaxDistance(),
-                preset.minY(), preset.maxY());
+                preset.minY(), preset.maxY(), config.getAutomaticSearchShape(world));
         session.inventory = Bukkit.createInventory(null, 54,
                 MessageUtil.parse("&6&lOlMeteor &8• &eAuto Ayar"));
         sessions.put(player.getUniqueId(), session);
@@ -74,6 +75,9 @@ public final class AutoSetupGUI implements Listener {
                 "&7Sol/sağ: maksimum ±250", "&7Shift+sol/sağ: minimum ±250"));
         s.inventory.setItem(33, item(Material.FEATHER, "&bY aralığı: &f" + s.minY + "-" + s.maxY,
                 "&7Air için kullanılır", "&7Sol/sağ: max ±10", "&7Shift+sol/sağ: min ±10"));
+        s.inventory.setItem(40, item(Material.MAP, "&eArama şekli: &f" + s.searchShape,
+                "&7Sol/sağ tıkla şekli değiştir",
+                "&7Daire, kare, üçgen, elmas veya altıgen"));
         s.inventory.setItem(49, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Aç",
                 "&7Bütün auto ayarlarını tek seferde kaydeder"));
         s.inventory.setItem(53, item(Material.BARRIER, "&cKapat", "&7Kaydetmeden kapatır"));
@@ -98,6 +102,7 @@ public final class AutoSetupGUI implements Listener {
         else if (slot == 29) adjustTime(s, event.isShiftClick(), event.isRightClick() ? -5 : 5);
         else if (slot == 31) adjustDistance(s, event.isShiftClick(), event.isRightClick() ? -250 : 250);
         else if (slot == 33) adjustY(s, event.isShiftClick(), event.isRightClick() ? -10 : 10);
+        else if (slot == 40) cycleSearchShape(s, event.isRightClick() ? -1 : 1);
         else if (slot == 49) { save(player, s); return; }
         else if (slot == 53) { sessions.remove(player.getUniqueId()); player.closeInventory(); return; }
         redraw(s);
@@ -138,10 +143,14 @@ public final class AutoSetupGUI implements Listener {
         if (minimum) s.minY = Math.max(world.getMinHeight(), Math.min(s.maxY - 1, s.minY + delta));
         else s.maxY = Math.min(world.getMaxHeight() - 1, Math.max(s.minY + 1, s.maxY + delta));
     }
+    private void cycleSearchShape(Session s, int delta) {
+        final RadiusShape[] shapes = RadiusShape.values();
+        s.searchShape = shapes[Math.floorMod(s.searchShape.ordinal() + delta, shapes.length)];
+    }
     private void save(Player player, Session s) {
         final boolean success = plugin.getConfigManager().setAutomaticRule(new ArrayList<>(s.types),
                 s.world, s.preset, List.of(s.lootBlock), s.minMinutes, s.maxMinutes,
-                s.minDistance, s.maxDistance, s.minY, s.maxY);
+                s.minDistance, s.maxDistance, s.minY, s.maxY, s.searchShape);
         if (success) {
             plugin.getMeteorEventManager().startAutomaticScheduler();
             sessions.remove(player.getUniqueId()); player.closeInventory();
@@ -165,11 +174,14 @@ public final class AutoSetupGUI implements Listener {
     private static final class Session {
         final EnumSet<MeteorType> types; String world, preset; Material lootBlock;
         int minMinutes, maxMinutes, minDistance, maxDistance, minY, maxY; Inventory inventory;
+        RadiusShape searchShape;
         Session(EnumSet<MeteorType> types, String world, String preset, Material lootBlock,
-                int minMinutes, int maxMinutes, int minDistance, int maxDistance, int minY, int maxY) {
+                int minMinutes, int maxMinutes, int minDistance, int maxDistance, int minY, int maxY,
+                RadiusShape searchShape) {
             this.types=types; this.world=world; this.preset=preset; this.lootBlock=lootBlock;
             this.minMinutes=minMinutes; this.maxMinutes=maxMinutes; this.minDistance=minDistance;
             this.maxDistance=maxDistance; this.minY=minY; this.maxY=maxY;
+            this.searchShape=searchShape;
         }
     }
 }

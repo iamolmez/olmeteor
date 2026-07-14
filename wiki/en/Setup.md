@@ -30,7 +30,7 @@
 ### 2. Place Files
 ```
 plugins/
-  OlMeteor-1.3.0.jar       -- Main plugin
+  OlMeteor-1.4.0.jar       -- Main plugin
   CommandAPI-*.jar           -- Required dependency
   FastAsyncWorldEdit-*.jar   -- Recommended (schematic operations)
   WorldGuard-*.jar           -- Optional

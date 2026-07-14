@@ -22,6 +22,8 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
@@ -33,6 +35,7 @@ import net.kyori.adventure.text.event.HoverEvent;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -81,6 +84,12 @@ public final class SetupManager implements Listener {
      * @param type   the meteor type to configure
      */
     public void enterSetupMode(@NotNull Player player, @NotNull MeteorType type) {
+        enterSetupModeAsync(player, type);
+    }
+
+    private @NotNull CompletableFuture<Boolean> enterSetupModeAsync(
+            @NotNull Player player, @NotNull MeteorType type) {
+        final CompletableFuture<Boolean> result = new CompletableFuture<>();
         final UUID playerUUID = player.getUniqueId();
 
         // Exit any existing setup mode first
@@ -93,6 +102,7 @@ public final class SetupManager implements Listener {
                 plugin.getFoliaScheduler().runForEntity(player, () -> {
             if (error != null || !Boolean.TRUE.equals(success)) {
                 configManager.sendMessage(player, "setup.backup_failed");
+                result.complete(false);
                 return;
             }
 
@@ -116,7 +126,9 @@ public final class SetupManager implements Listener {
             configManager.sendMessage(player, "setup.entered", "type", configManager.getMeteorTypeName(type));
 
             updateActionBar(player, session);
+            result.complete(true);
         }));
+        return result;
     }
 
     /** Pastes a saved schematic in front of the player and opens it for editing. */
@@ -128,11 +140,16 @@ public final class SetupManager implements Listener {
             configManager.sendMessage(player, "setup.choice.not_found", "name", requestedName);
             return;
         }
+        if (!plugin.getFAWEHook().isAvailable()) {
+            configManager.sendMessage(player, "setup.schematic.fawe_required");
+            return;
+        }
 
-        enterSetupMode(player, type);
-        plugin.getFoliaScheduler().runLaterAtLocation(player.getLocation(), () -> {
+        enterSetupModeAsync(player, type).thenAccept(entered -> {
+            if (!entered) return;
+            plugin.getFoliaScheduler().runForEntity(player, () -> {
             final SetupSession current = activeSessions.get(player.getUniqueId());
-            if (current == null) return;
+            if (current == null || !player.isOnline()) return;
             final Location pasteAt = player.getLocation().clone()
                     .add(player.getLocation().getDirection().setY(0).normalize().multiply(8))
                     .toBlockLocation();
@@ -140,19 +157,32 @@ public final class SetupManager implements Listener {
             final int previewRadius = configManager.getTypeConfig(type).impactRadius();
             final Location previewPasteCenter = plugin.getSchematicManager()
                     .adjustedPasteCenter(existing.get(), pasteAt);
-            plugin.getRollbackSystem().captureSchematicArea(snapshotId, previewPasteCenter,
+            final boolean captured = plugin.getRollbackSystem().captureSchematicArea(
+                    snapshotId, previewPasteCenter,
                     plugin.getSchematicManager().getSchematicFile(existing.get()), previewRadius * 2);
+            if (!captured) {
+                MessageUtil.sendMessage(player,
+                        "&cDüzenleme alanının güvenli geri yükleme görüntüsü alınamadı.");
+                return;
+            }
             editPreviewSnapshots.put(player.getUniqueId(), snapshotId);
-            final boolean pasted = plugin.getSchematicManager()
-                    .pasteSchematic(existing.get(), pasteAt, player.getWorld());
-            if (pasted) {
+            plugin.getSchematicManager().pasteSchematicAsync(
+                    existing.get(), pasteAt, pasteAt.getWorld()).whenComplete((pasted, error) ->
+                    plugin.getFoliaScheduler().runForEntity(player, () -> {
+            final SetupSession liveSession = activeSessions.get(player.getUniqueId());
+            if (liveSession == null) {
+                plugin.getRollbackSystem().rollbackEvent(snapshotId);
+                editPreviewSnapshots.remove(player.getUniqueId(), snapshotId);
+                return;
+            }
+            if (error == null && Boolean.TRUE.equals(pasted)) {
                 final List<org.bukkit.util.Vector> storedMobs =
                         configManager.getSchematicMobOffsets(existing.get());
                 final List<org.bukkit.util.Vector> storedHolograms =
                         configManager.getSchematicHologramOffsets(existing.get());
                 final List<org.bukkit.util.Vector> storedChests =
                         configManager.getSchematicChestOffsets(existing.get());
-                final SetupSession loaded = current.withSchematicName(existing.get())
+                final SetupSession loaded = liveSession.withSchematicName(existing.get())
                         .withPasteAnchor(pasteAt)
                         .withSavedPoints(
                                 locationsFromOffsets(pasteAt, storedMobs.isEmpty()
@@ -164,7 +194,9 @@ public final class SetupManager implements Listener {
                 activeSessions.put(player.getUniqueId(), loaded);
                 loaded.chestPoints().forEach(chest -> {
                     if (chest.getWorld() != null) {
-                        chest.getBlock().setType(configManager.getLootBlockMaterial(type), false);
+                        plugin.getFoliaScheduler().runAtLocation(chest, () ->
+                                chest.getBlock().setType(
+                                        configManager.getLootBlockMaterial(type), false));
                     }
                 });
                 final SetupVisual oldVisual = activeVisuals.remove(player.getUniqueId());
@@ -176,10 +208,12 @@ public final class SetupManager implements Listener {
                         + loaded.chestPoints().size());
             } else {
                 plugin.getRollbackSystem().rollbackEvent(snapshotId);
-                editPreviewSnapshots.remove(player.getUniqueId());
+                editPreviewSnapshots.remove(player.getUniqueId(), snapshotId);
                 MessageUtil.sendMessage(player, "&cSchematic düzenleme alanına yerleştirilemedi.");
             }
-        }, 10L);
+                    }));
+            });
+        });
     }
 
     /** Shows clickable choices for creating a setup or selecting an existing schematic. */
@@ -274,6 +308,10 @@ public final class SetupManager implements Listener {
     private void exitSetupMode(@NotNull Player player, boolean restorePreview) {
         final UUID playerUUID = player.getUniqueId();
         final SetupSession session = activeSessions.remove(playerUUID);
+        if (session == null && !inventoryBackup.hasBackup(player)) {
+            MessageUtil.sendMessage(player, "&cAktif setup oturumun yok.");
+            return;
+        }
 
         final String previewSnapshot = editPreviewSnapshots.remove(playerUUID);
         if (previewSnapshot != null) {
@@ -336,7 +374,7 @@ public final class SetupManager implements Listener {
     public void exitAllSetupModes() {
         for (final Player player : plugin.getServer().getOnlinePlayers()) {
             if (activeSessions.containsKey(player.getUniqueId())) {
-                exitSetupMode(player);
+                plugin.getFoliaScheduler().runForEntity(player, () -> exitSetupMode(player));
             }
         }
     }
@@ -478,6 +516,15 @@ public final class SetupManager implements Listener {
             handleLootEditorClick(player, session, event);
         } else if (type == Material.NAME_TAG && rightClick && event.getClickedBlock() != null) {
             final Location hologram = event.getClickedBlock().getLocation().add(0.5, 2.0, 0.5);
+            final Optional<Location> existing = session.hologramPoints().stream()
+                    .filter(point -> point.getWorld().equals(hologram.getWorld())
+                            && point.distanceSquared(hologram) < 0.1).findFirst();
+            if (existing.isPresent()) {
+                session.hologramPoints().remove(existing.get());
+                MessageUtil.sendMessage(player, "&cYazı konumu silindi: &e"
+                        + formatLocation(hologram));
+                return;
+            }
             session.hologramPoints().add(hologram);
             MessageUtil.sendMessage(player, "&aYazı konumu eklendi: &e" + formatLocation(hologram));
         } else if (type == Material.RECOVERY_COMPASS && rightClick
@@ -546,6 +593,30 @@ public final class SetupManager implements Listener {
         final MobChanceSession session = mobChanceEditors.remove(player.getUniqueId());
         if (session != null && event.getInventory().equals(session.inventory())) {
             configManager.setMythicMobChances(session.type(), session.chances());
+        }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        if (activeSessions.containsKey(event.getPlayer().getUniqueId())
+                || inventoryBackup.hasBackup(event.getPlayer())) {
+            exitSetupMode(event.getPlayer());
+        }
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        final Player player = event.getPlayer();
+        if (!inventoryBackup.hasBackup(player)) return;
+        activeSessions.remove(player.getUniqueId());
+        final SetupVisual visual = activeVisuals.remove(player.getUniqueId());
+        if (visual != null) visual.stop();
+        plugin.getSetupCommandBlocker().removeBlockedPlayer(player);
+        if (inventoryBackup.restoreInventory(player)) {
+            player.updateInventory();
+            configManager.sendMessage(player, "setup.exited");
+        } else {
+            configManager.sendMessage(player, "setup.exit_failed");
         }
     }
 

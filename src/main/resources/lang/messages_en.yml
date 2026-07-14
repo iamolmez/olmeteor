@@ -39,6 +39,7 @@ messages:
       invalid_type: "&cInvalid meteor type: &e%type%"
       scheduled: "&aMeteor event &e%eventId% &ascheduled at &e%location%"
       error: "&cAn error occurred while starting the event: %error%"
+      fawe_required: "&cThe meteor could not start: FAWE must be installed and enabled for safe schematic and terrain restoration."
       location_fail: "&cCould not find a suitable location for the meteor event. Try a different world or type."
       world_not_found: "&cWorld '%world%' not found."
 
@@ -66,6 +67,7 @@ messages:
       world: "&7World: &f%world%"
       location: "&7Location: &f%location%"
       radius: "&7Radius: &f%radius% blocks"
+      radius_shape: "&7Radius shape: &f%shape%"
       schematic: "&7Schematic: &f%schematic%"
       distance: "&7Distance to &e%player%&7: &f%distance% blocks"
 

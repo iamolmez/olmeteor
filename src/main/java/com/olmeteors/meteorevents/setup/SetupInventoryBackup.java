@@ -57,6 +57,7 @@ public final class SetupInventoryBackup {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
+                Files.createDirectories(inventoriesPath);
                 final File backupFile = getBackupFile(playerId);
                 final YamlConfiguration config = new YamlConfiguration();
 
@@ -134,7 +135,8 @@ public final class SetupInventoryBackup {
                     for (final String key : section.getKeys(false)) {
                         final int slot = Integer.parseInt(key);
                         final ItemStack item = config.getItemStack("inventory." + key);
-                        if (item != null) {
+                        if (item != null && slot >= 0
+                                && slot < player.getInventory().getSize()) {
                             player.getInventory().setItem(slot, item);
                         }
                     }
@@ -148,7 +150,9 @@ public final class SetupInventoryBackup {
                     final ItemStack[] armor = new ItemStack[4];
                     for (final String key : section.getKeys(false)) {
                         final int slot = Integer.parseInt(key);
-                        armor[slot] = config.getItemStack("armor." + key);
+                        if (slot >= 0 && slot < armor.length) {
+                            armor[slot] = config.getItemStack("armor." + key);
+                        }
                     }
                     player.getInventory().setArmorContents(armor);
                 }
@@ -158,10 +162,13 @@ public final class SetupInventoryBackup {
             if (config.contains("extra")) {
                 final var section = config.getConfigurationSection("extra");
                 if (section != null) {
-                    final ItemStack[] extra = new ItemStack[1];
+                    final ItemStack[] extra = new ItemStack[
+                            player.getInventory().getExtraContents().length];
                     for (final String key : section.getKeys(false)) {
                         final int slot = Integer.parseInt(key);
-                        extra[slot] = config.getItemStack("extra." + key);
+                        if (slot >= 0 && slot < extra.length) {
+                            extra[slot] = config.getItemStack("extra." + key);
+                        }
                     }
                     player.getInventory().setExtraContents(extra);
                 }

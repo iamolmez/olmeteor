@@ -113,7 +113,7 @@ OlMeteor can recover terrain changes from incomplete events after a server crash
 Example output:
 ```
 === OlMeteor Debug ===
-Plugin: OlMeteor 1.3.0
+Plugin: OlMeteor 1.4.0
 Server: Paper 1.21.3
 
 Integrations:

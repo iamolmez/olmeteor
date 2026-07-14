@@ -4,7 +4,26 @@ This page contains changes from current and past versions of OlMeteor.
 
 ---
 
-## Version 1.3.0 (Current)
+## Version 1.4.0 (Current)
+
+**Release:** 2026 | **Java:** 21 | **Server:** Paper/Folia 1.21.1+
+
+### Added and Fixed
+
+- Per-meteor `CIRCLE`, `SQUARE`, `TRIANGLE`, `DIAMOND`, and `HEXAGON` radius shapes
+- Shape-aware hazards, participation, death/reward zones, and terrain validation
+- Accurate radius shape rendering in `/olmeteor preview`
+- Chunk-snapshot based Folia-safe automatic location search
+- Entity/region scheduler fixes for hazards, setup visuals, and display animations
+- Meteor display task leak fix
+- Automatic ticket refunds when a meteor start fails or is cancelled
+- Deferred ticket refunds when the player is offline
+- Location-region lifecycle event dispatch
+- Gradle and Mockito test maintenance warning cleanup
+
+---
+
+## Version 1.3.0
 
 **Release:** 2024 | **Java:** 21 | **Server:** Paper/Folia 1.21.1+
 

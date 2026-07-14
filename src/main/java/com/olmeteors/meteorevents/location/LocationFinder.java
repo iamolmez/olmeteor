@@ -3,6 +3,7 @@ package com.olmeteors.meteorevents.location;
 import com.olmeteors.meteorevents.MeteorPlugin;
 import com.olmeteors.meteorevents.config.ConfigManager;
 import com.olmeteors.meteorevents.event.MeteorType;
+import com.olmeteors.meteorevents.event.RadiusShape;
 import com.olmeteors.meteorevents.hook.TownyHook;
 import com.olmeteors.meteorevents.hook.WGHook;
 import com.olmeteors.meteorevents.util.MessageUtil;
@@ -12,6 +13,7 @@ import org.bukkit.World;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.block.Block;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.HashMap;
@@ -91,7 +93,7 @@ public final class LocationFinder {
                                                              int minDistance, int maxDistance) {
         final int maxAttempts = configManager.getMaxLocationAttempts();
         final int bufferZone = configManager.getBufferZone();
-        final int impactRadius = type.impactRadius();
+        final int impactRadius = configManager.getTypeConfig(type).impactRadius();
         final int varianceTolerance = configManager.getTerrainVarianceTolerance();
 
         plugin.getLogger().info("Searching for suitable meteor location in world: "
@@ -100,7 +102,9 @@ public final class LocationFinder {
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // Generate random coordinates within bounds
-                final int[] coordinates = generateCoordinates(world, minDistance, maxDistance);
+                final int[] coordinates = generateCoordinates(world, minDistance, maxDistance,
+                        RadiusShape.CIRCLE);
+                if (coordinates == null) return Optional.empty();
                 final int x = coordinates[0];
                 final int z = coordinates[1];
 
@@ -167,9 +171,17 @@ public final class LocationFinder {
     public @NotNull CompletableFuture<Optional<Location>> findSuitableLocationAsync(
             @NotNull World world, @NotNull MeteorType type,
             @NotNull ConfigManager.LocationPreset preset, int minDistance, int maxDistance) {
+        return findSuitableLocationAsync(world, type, preset, minDistance, maxDistance,
+                RadiusShape.CIRCLE);
+    }
+
+    public @NotNull CompletableFuture<Optional<Location>> findSuitableLocationAsync(
+            @NotNull World world, @NotNull MeteorType type,
+            @NotNull ConfigManager.LocationPreset preset, int minDistance, int maxDistance,
+            @NotNull RadiusShape searchShape) {
         final CompletableFuture<Optional<Location>> result = new CompletableFuture<>();
         plugin.getFoliaScheduler().callGlobal(() -> searchSnapshotAttempt(world, type, preset,
-                minDistance, maxDistance, 1, result)).exceptionally(error -> {
+                minDistance, maxDistance, searchShape, 1, result)).exceptionally(error -> {
             result.completeExceptionally(error);
             return null;
         });
@@ -178,7 +190,8 @@ public final class LocationFinder {
 
     private void searchSnapshotAttempt(@NotNull World world, @NotNull MeteorType type,
                                        @NotNull ConfigManager.LocationPreset preset,
-                                       int minDistance, int maxDistance, int attempt,
+                                       int minDistance, int maxDistance,
+                                       @NotNull RadiusShape searchShape, int attempt,
                                        @NotNull CompletableFuture<Optional<Location>> result) {
         if (result.isDone()) return;
         final int maxAttempts = configManager.getMaxLocationAttempts();
@@ -189,13 +202,21 @@ public final class LocationFinder {
             return;
         }
 
-        final int[] coordinates = generateCoordinates(world, minDistance, maxDistance);
+        final int[] coordinates = generateCoordinates(world, minDistance, maxDistance, searchShape);
+        if (coordinates == null) {
+            plugin.getLogger().warning("Automatic search area does not intersect the world border in "
+                    + world.getName() + " (shape=" + searchShape + ", distance="
+                    + minDistance + "-" + maxDistance + ")");
+            result.complete(Optional.empty());
+            return;
+        }
         final int x = coordinates[0];
         final int z = coordinates[1];
         final int minY = Math.max(world.getMinHeight() + 1, preset.minY());
         final int maxY = Math.min(world.getMaxHeight() - 2, preset.maxY());
         if (minY > maxY) {
-            searchSnapshotAttempt(world, type, preset, minDistance, maxDistance, attempt + 1, result);
+            searchSnapshotAttempt(world, type, preset, minDistance, maxDistance,
+                    searchShape, attempt + 1, result);
             return;
         }
 
@@ -203,11 +224,13 @@ public final class LocationFinder {
             if (candidateY.isEmpty()) return CompletableFuture.completedFuture(Optional.<Location>empty());
             final Location candidate = new Location(world, x + 0.5, candidateY.get(), z + 0.5);
             if (isRecentlyUsed(candidate)) return CompletableFuture.completedFuture(Optional.<Location>empty());
-            return validateSnapshotsAsync(candidate, type.impactRadius(), preset).thenCompose(valid -> {
+            final int configuredRadius = configManager.getTypeConfig(type).impactRadius();
+            return validateSnapshotsAsync(candidate, configuredRadius, preset,
+                    configManager.getRadiusShape(type)).thenCompose(valid -> {
                 if (!valid) return CompletableFuture.completedFuture(Optional.<Location>empty());
                 final AtomicBoolean conflicting = new AtomicBoolean(true);
                 return plugin.getFoliaScheduler().callAtLocation(candidate, () -> conflicting.set(
-                                isLocationConflicting(candidate, type.impactRadius(),
+                                isLocationConflicting(candidate, configuredRadius,
                                         configManager.getBufferZone())))
                         .thenApply(ignored -> conflicting.get()
                                 ? Optional.<Location>empty() : Optional.of(candidate));
@@ -216,7 +239,7 @@ public final class LocationFinder {
             if (result.isDone()) return;
             if (error != null || candidate == null || candidate.isEmpty()) {
                 plugin.getFoliaScheduler().callGlobal(() -> searchSnapshotAttempt(world, type, preset,
-                        minDistance, maxDistance, attempt + 1, result));
+                        minDistance, maxDistance, searchShape, attempt + 1, result));
                 return;
             }
             plugin.getLogger().info("Suitable meteor location found at: "
@@ -248,7 +271,8 @@ public final class LocationFinder {
     }
 
     private CompletableFuture<Boolean> validateSnapshotsAsync(Location candidate, int radius,
-                                                                ConfigManager.LocationPreset preset) {
+                                                                ConfigManager.LocationPreset preset,
+                                                                RadiusShape shape) {
         final World world = candidate.getWorld();
         final int centerX = candidate.getBlockX();
         final int centerY = candidate.getBlockY();
@@ -277,6 +301,7 @@ public final class LocationFinder {
                         final int step = Math.max(1, radius / samplesPerAxis);
                         for (int dx = -radius; dx <= radius; dx += step) {
                             for (int dz = -radius; dz <= radius; dz += step) {
+                                if (!shape.contains(dx, dz, radius)) continue;
                                 final int height = snapshotHeight(snapshots, centerX + dx, centerZ + dz);
                                 lowest = Math.min(lowest, height);
                                 highest = Math.max(highest, height);
@@ -289,6 +314,7 @@ public final class LocationFinder {
                     int checks = 0;
                     for (int dx = -radius; dx <= radius; dx += 2) {
                         for (int dz = -radius; dz <= radius; dz += 2) {
+                            if (!shape.contains(dx, dz, radius)) continue;
                             final Material material = snapshotBlock(snapshots,
                                     centerX + dx, centerY, centerZ + dz);
                             if (material == Material.WATER) water++;
@@ -474,6 +500,11 @@ public final class LocationFinder {
                                       @NotNull ConfigManager.LocationPreset preset) {
         if (material == Material.WATER) return preset.allowWater();
         if (material == Material.LAVA) return preset.allowLava();
+        // any_surface modu: düzlük gerektirmeyen ve özel blok listesi olmayan presetler,
+        // su ve lav hariç tüm blokları kabul eder (taş, toprak, ağaç, maden vs.)
+        if (!preset.requireFlat() && preset.allowedFloorBlocks().isEmpty()) {
+            return material.isSolid();
+        }
         if (!preset.allowedFloorBlocks().isEmpty()) {
             return preset.allowedFloorBlocks().stream()
                     .map(Material::matchMaterial).filter(java.util.Objects::nonNull)
@@ -494,20 +525,28 @@ public final class LocationFinder {
         return false;
     }
 
-    private int @NotNull [] generateCoordinates(@NotNull World world, int minDistance, int maxDistance) {
+    private int @Nullable [] generateCoordinates(@NotNull World world, int minDistance,
+                                                  int maxDistance,
+                                                  @NotNull RadiusShape searchShape) {
         final Location spawn = world.getSpawnLocation();
-        final double angle = ThreadLocalRandom.current().nextDouble(2 * Math.PI);
-        final double distance = ThreadLocalRandom.current().nextDouble(minDistance, maxDistance);
-        int x = spawn.getBlockX() + (int) Math.round(distance * Math.cos(angle));
-        int z = spawn.getBlockZ() + (int) Math.round(distance * Math.sin(angle));
         final org.bukkit.WorldBorder border = world.getWorldBorder();
         final int margin = 16;
         final double half = Math.max(1.0, border.getSize() / 2.0 - margin);
-        x = (int) Math.max(border.getCenter().getX() - half,
-                Math.min(border.getCenter().getX() + half, x));
-        z = (int) Math.max(border.getCenter().getZ() - half,
-                Math.min(border.getCenter().getZ() + half, z));
-        return new int[]{x, z};
+        final double minX = border.getCenter().getX() - half;
+        final double maxX = border.getCenter().getX() + half;
+        final double minZ = border.getCenter().getZ() - half;
+        final double maxZ = border.getCenter().getZ() + half;
+        final ThreadLocalRandom random = ThreadLocalRandom.current();
+        for (int attempt = 0; attempt < 512; attempt++) {
+            final double dx = random.nextDouble(-maxDistance, maxDistance);
+            final double dz = random.nextDouble(-maxDistance, maxDistance);
+            if (!searchShape.contains(dx, dz, maxDistance)
+                    || (minDistance > 0 && searchShape.contains(dx, dz, minDistance))) continue;
+            final int x = spawn.getBlockX() + (int) Math.round(dx);
+            final int z = spawn.getBlockZ() + (int) Math.round(dz);
+            if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return new int[]{x, z};
+        }
+        return null;
     }
 
     private String formatLocation(Location loc) {

@@ -93,11 +93,14 @@ public final class MeteorPlugin extends JavaPlugin {
             this.foliaScheduler = new FoliaScheduler(this);
 
             // Initialize utility hooks
-            this.faweHook = new FAWEHook(this);
+            this.faweHook = FAWEHook.create(this,
+                    pluginManager.getPlugin("FastAsyncWorldEdit"));
             this.wgHook = WGHook.create(this, pluginManager.getPlugin("WorldGuard"));
-            this.townyHook = new TownyHook(this);
-            this.mythicMobsHook = new MythicMobsHook(this);
-            this.placeholderAPIHook = new PlaceholderAPIHook(this);
+            this.townyHook = TownyHook.create(this, pluginManager.getPlugin("Towny"));
+            this.mythicMobsHook = MythicMobsHook.create(this,
+                    pluginManager.getPlugin("MythicMobs"));
+            this.placeholderAPIHook = PlaceholderAPIHook.create(this,
+                    pluginManager.getPlugin("PlaceholderAPI"));
 
             // Initialize core systems
             this.schematicManager = new SchematicManager(this, faweHook);
@@ -169,6 +172,8 @@ public final class MeteorPlugin extends JavaPlugin {
                 this.foliaScheduler == null ? null : this.foliaScheduler::cancelAllTasks);
         safelyShutdown("setup sessions",
                 this.setupManager == null ? null : this.setupManager::exitAllSetupModes);
+        safelyShutdown("PlaceholderAPI expansion",
+                this.placeholderAPIHook == null ? null : this.placeholderAPIHook::shutdown);
         safelyShutdown("player statistics", this.playerStatsStore == null ? null : this.playerStatsStore::save);
         getLogger().info("OlMeteor disabled successfully");
     }

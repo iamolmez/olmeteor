@@ -2,7 +2,7 @@
 
 OlMeteor; Paper ve Folia sunuculari icin hazirlanmis, tamamen ozellestirilebilir bir meteor etkinligi eklentisidir. Schematic tabanli carpma alanlari, animasyonlu dusus, dalgali yaratik sistemi, kisisel ganimetler, hasar siralamasi, otomatik etkinlikler ve guvenli arazi geri yukleme ozelliklerini tek bir pakette sunar.
 
-> Bu dokumantasyon **OlMeteor 1.3.0** ve **Paper/Folia 1.21.1+** icin hazirlanmistir. Sunucuda **Java 21** kullanilmalidir.
+> Bu dokumantasyon **OlMeteor 1.4.0** ve **Paper/Folia 1.21.1+** icin hazirlanmistir. Sunucuda **Java 21** kullanilmalidir.
 
 ---
 
