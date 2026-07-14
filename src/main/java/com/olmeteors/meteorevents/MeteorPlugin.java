@@ -5,6 +5,7 @@ import com.olmeteors.meteorevents.display.DisplayEntityManager;
 import com.olmeteors.meteorevents.event.MeteorEventManager;
 import com.olmeteors.meteorevents.hazard.HazardManager;
 import com.olmeteors.meteorevents.gui.AutoSetupGUI;
+import com.olmeteors.meteorevents.gui.ConfigGUI;
 import com.olmeteors.meteorevents.hook.FAWEHook;
 import com.olmeteors.meteorevents.hook.MythicMobsHook;
 import com.olmeteors.meteorevents.hook.PlaceholderAPIHook;
@@ -61,6 +62,7 @@ public final class MeteorPlugin extends JavaPlugin {
     private MythicMobsHook mythicMobsHook;
     private PlaceholderAPIHook placeholderAPIHook;
     private AutoSetupGUI autoSetupGUI;
+    private ConfigGUI configGUI;
     private PlayerStatsStore playerStatsStore;
     private MeteorTicketManager meteorTicketManager;
 
@@ -112,6 +114,7 @@ public final class MeteorPlugin extends JavaPlugin {
             this.vaultManager = new VaultManager(this, displayEntityManager, mythicMobsHook);
             this.lootGUIEditor = new LootGUIEditor(this, configManager);
             this.autoSetupGUI = new AutoSetupGUI(this);
+            this.configGUI = new ConfigGUI(this);
             this.playerStatsStore = new PlayerStatsStore(this);
             this.meteorTicketManager = new MeteorTicketManager(this);
 
@@ -203,6 +206,7 @@ public final class MeteorPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(this.meteorEventManager, this);
         getServer().getPluginManager().registerEvents(this.hazardManager, this);
         getServer().getPluginManager().registerEvents(this.autoSetupGUI, this);
+        getServer().getPluginManager().registerEvents(this.configGUI, this);
         getServer().getPluginManager().registerEvents(this.meteorTicketManager, this);
     }
 
@@ -328,6 +332,7 @@ public final class MeteorPlugin extends JavaPlugin {
     }
 
     public AutoSetupGUI getAutoSetupGUI() { return autoSetupGUI; }
+    public ConfigGUI getConfigGUI() { return configGUI; }
     public PlayerStatsStore getPlayerStatsStore() { return playerStatsStore; }
     public MeteorTicketManager getMeteorTicketManager() { return meteorTicketManager; }
 }
