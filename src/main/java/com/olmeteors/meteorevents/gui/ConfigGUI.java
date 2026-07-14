@@ -11,10 +11,12 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -48,6 +50,7 @@ public final class ConfigGUI implements Listener {
     private final MeteorPlugin plugin;
     private final ConfigManager config;
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
+    private final Map<UUID, RewardsChatContext> rewardsChatContexts = new ConcurrentHashMap<>();
 
     public ConfigGUI(MeteorPlugin plugin) {
         this.plugin = plugin;
@@ -598,21 +601,29 @@ public final class ConfigGUI implements Listener {
         s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
         final MeteorType type = s.editingType;
         if (type == null) return;
-        final var tc = config.getTypeConfig(type);
+        // Use edited lists if modified, otherwise read from config
+        final List<String> generalCmds = s.rewardsEdited
+                ? s.editGeneralCommands : config.getTypeConfig(type).rewardsCommands();
+        final List<String> generalItems = s.rewardsEdited
+                ? s.editGeneralItems : config.getRankingRewardItems(type, 0);
         s.inventory.setItem(10, item(Material.BOOK, "&eGenel Ödül Komutları",
                 "&7Bu meteor türü için kasa açılış komutları",
-                "&7&lSayı: &f" + tc.rewardsCommands().size()));
+                "&7&lSayı: &f" + generalCmds.size(),
+                "&7&lTıkla düzenle (sohbet)"));
         s.inventory.setItem(11, item(Material.CHEST, "&eGenel Ödül Eşyaları",
                 "&7Bu meteor türü için kasa açılış eşyaları",
-                "&7&lSayı: &f" + config.getRankingRewardItems(type, 0).size()));
+                "&7&lSayı: &f" + generalItems.size(),
+                "&7&lTıkla düzenle (sohbet)"));
         final String rankLabel = s.editRank == 0 ? "&6Genel Ödüller" : "&6Sıralama Ödülleri &7(#" + s.editRank + ")";
         final String slotLabel = s.editRank == 0 ? "&bGenel" : "&bSıra #" + s.editRank;
         s.inventory.setItem(14, item(Material.EMERALD, rankLabel,
                 "&7Sol/sağ: sırayı değiştir",
                 "&7Düzenlemek için tıkla"));
         // Show rank-specific info
-        final List<String> rankItems = config.getRankingRewardItems(type, s.editRank);
-        final List<String> rankCmds = config.getRankingRewardCommands(type, s.editRank);
+        final List<String> rankItems = s.rewardsEdited
+                ? s.editRankItems : config.getRankingRewardItems(type, s.editRank);
+        final List<String> rankCmds = s.rewardsEdited
+                ? s.editRankCmds : config.getRankingRewardCommands(type, s.editRank);
         s.inventory.setItem(15, item(Material.DIAMOND,
                 slotLabel + " &7- Eşyalar",
                 rankItems.isEmpty()
@@ -633,6 +644,16 @@ public final class ConfigGUI implements Listener {
         if (typeIndex >= 0 && typeIndex < types.length) {
             s.editingType = types[typeIndex];
             s.editRank = 0;
+            // Load current config values into editable lists
+            s.rewardsEdited = false;
+            s.editGeneralCommands.clear();
+            s.editGeneralCommands.addAll(config.getTypeConfig(s.editingType).rewardsCommands());
+            s.editGeneralItems.clear();
+            s.editGeneralItems.addAll(config.getRankingRewardItems(s.editingType, 0));
+            s.editRankCmds.clear();
+            s.editRankCmds.addAll(config.getRankingRewardCommands(s.editingType, 0));
+            s.editRankItems.clear();
+            s.editRankItems.addAll(config.getRankingRewardItems(s.editingType, 0));
             drawRewardsEditPage(s);
         }
     }
@@ -644,7 +665,16 @@ public final class ConfigGUI implements Listener {
         if (slot == 14) {
             // 0=genel ödüller, 1-3=sıralama ödülleri
             s.editRank = Math.floorMod(s.editRank + (right ? -1 : 1), 4);
+            // Rank değişince rank listelerini config'den yeniden yükle (genel listeler etkilenmez)
+            s.editRankCmds.clear();
+            s.editRankCmds.addAll(config.getRankingRewardCommands(s.editingType, s.editRank));
+            s.editRankItems.clear();
+            s.editRankItems.addAll(config.getRankingRewardItems(s.editingType, s.editRank));
             drawRewardsEditPage(s);
+        } else if (slot == 10 || slot == 11 || slot == 15 || slot == 16) {
+            // Chat-based editing
+            final Player player = (Player) event.getWhoClicked();
+            promptRewardsChatEdit(player, s, slot, event);
         }
     }
 
@@ -821,6 +851,16 @@ public final class ConfigGUI implements Listener {
             fileConfig.set("event.tickets.material", s.ticketMaterial);
             fileConfig.set("event.tickets.cooldown-seconds", s.ticketCooldown);
         }
+        // Rewards
+        if (s.rewardsEdited && s.editingType != null) {
+            final String base = "meteor-types." + s.editingType.name().toLowerCase(Locale.ROOT) + ".";
+            fileConfig.set(base + "rewards-commands", new ArrayList<>(s.editGeneralCommands));
+            fileConfig.set(base + "rewards-items", new ArrayList<>(s.editGeneralItems));
+            fileConfig.set(base + "ranking-rewards." + s.editRank + ".commands",
+                    new ArrayList<>(s.editRankCmds));
+            fileConfig.set(base + "ranking-rewards." + s.editRank + ".items",
+                    new ArrayList<>(s.editRankItems));
+        }
         // Save to disk
         try {
             fileConfig.save(new java.io.File(plugin.getDataFolder(), "config.yml"));
@@ -858,6 +898,118 @@ public final class ConfigGUI implements Listener {
         fileConfig.set(base + "block", s.editLootBlock != null ? s.editLootBlock.name() : "CHEST");
         fileConfig.set(base + "access-mode", s.editAccessMode);
         fileConfig.set(base + "personal", s.editPersonalLoot);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  REWARDS CHAT EDIT
+    // ────────────────────────────────────────────────────────────────
+
+    private record RewardsChatContext(
+            @NotNull Session session,
+            @NotNull MeteorType type,
+            int rank,
+            @NotNull RewardField field
+    ) {
+        enum RewardField { GENERAL_COMMANDS, GENERAL_ITEMS, RANK_COMMANDS, RANK_ITEMS }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onRewardsChat(AsyncPlayerChatEvent event) {
+        final Player player = event.getPlayer();
+        final RewardsChatContext ctx = rewardsChatContexts.get(player.getUniqueId());
+        if (ctx == null) return;
+        event.setCancelled(true);
+        final String input = event.getMessage().trim();
+        plugin.getFoliaScheduler().callGlobal(() ->
+                processRewardsChatInput(player, ctx, input));
+    }
+
+    private void processRewardsChatInput(Player player, RewardsChatContext ctx, String input) {
+        try {
+            rewardsChatContexts.remove(player.getUniqueId());
+            if (input.equalsIgnoreCase("done") || input.equalsIgnoreCase("cancel")
+                    || input.equalsIgnoreCase("exit") || input.equals("0")) {
+                reopenRewardsEditor(player, ctx);
+                return;
+            }
+            final List<String> targetList = getRewardTargetList(ctx.session, ctx.field);
+            final boolean isRemove = input.startsWith("-");
+            final String value = (isRemove || input.startsWith("+"))
+                    ? input.substring(1).trim() : input.trim();
+            if (value.isEmpty()) {
+                MessageUtil.sendMessage(player, "&cGeçersiz giriş. Boş değer eklenemez.");
+                reopenRewardsEditor(player, ctx);
+                return;
+            }
+            if (isRemove) {
+                final boolean removed = targetList.remove(value);
+                if (removed) {
+                    MessageUtil.sendMessage(player, "&aKaldırıldı: &f" + value);
+                } else {
+                    MessageUtil.sendMessage(player, "&eBulunamadı: &f" + value);
+                }
+            } else {
+                targetList.add(value);
+                MessageUtil.sendMessage(player, "&aEklendi: &f" + value);
+            }
+            ctx.session.rewardsEdited = true;
+            reopenRewardsEditor(player, ctx);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Rewards chat input error: " + e.getMessage());
+            rewardsChatContexts.remove(player.getUniqueId());
+        }
+    }
+
+    private @NotNull List<String> getRewardTargetList(Session s, RewardsChatContext.RewardField field) {
+        return switch (field) {
+            case GENERAL_COMMANDS -> s.editGeneralCommands;
+            case GENERAL_ITEMS -> s.editGeneralItems;
+            case RANK_COMMANDS -> s.editRankCmds;
+            case RANK_ITEMS -> s.editRankItems;
+        };
+    }
+
+    private void reopenRewardsEditor(Player player, RewardsChatContext ctx) {
+        final Session s = ctx.session;
+        s.editingType = ctx.type;
+        s.editRank = ctx.rank;
+        // Re-create inventory
+        s.inventory = Bukkit.createInventory(null, 54,
+                MessageUtil.parse("&6&lOlMeteor &8• &eConfig Ayarları"));
+        sessions.put(player.getUniqueId(), s);
+        drawRewardsEditPage(s);
+        player.openInventory(s.inventory);
+    }
+
+    private void promptRewardsChatEdit(Player player, Session s, int slot,
+                                        InventoryClickEvent event) {
+        final MeteorType type = s.editingType;
+        if (type == null) return;
+        final int rank = s.editRank;
+        final RewardsChatContext.RewardField field;
+        final String label;
+        if (slot == 10) {
+            field = RewardsChatContext.RewardField.GENERAL_COMMANDS;
+            label = "genel komut";
+        } else if (slot == 11) {
+            field = RewardsChatContext.RewardField.GENERAL_ITEMS;
+            label = "genel eşya";
+        } else if (slot == 15) {
+            field = RewardsChatContext.RewardField.RANK_ITEMS;
+            label = "sıralama eşyası";
+        } else if (slot == 16) {
+            field = RewardsChatContext.RewardField.RANK_COMMANDS;
+            label = "sıralama komutu";
+        } else return;
+        final RewardsChatContext ctx = new RewardsChatContext(s, type, rank, field);
+        rewardsChatContexts.put(player.getUniqueId(), ctx);
+        player.closeInventory();
+        MessageUtil.sendMessage(player, "");
+        MessageUtil.sendMessage(player, "&6&l✦ " + label + " düzenle");
+        MessageUtil.sendMessage(player, "&7Eklemek için: &fdeğer");
+        MessageUtil.sendMessage(player, "&7Çıkarmak için: &f-değer");
+        MessageUtil.sendMessage(player, "&7Bitince: &fdone");
+        MessageUtil.sendMessage(player, "");
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -931,6 +1083,11 @@ public final class ConfigGUI implements Listener {
         boolean editPersonalLoot;
         // Rewards edit
         int editRank;
+        boolean rewardsEdited;
+        List<String> editGeneralCommands = new ArrayList<>();
+        List<String> editGeneralItems = new ArrayList<>();
+        List<String> editRankCmds = new ArrayList<>();
+        List<String> editRankItems = new ArrayList<>();
         // Ticket
         String ticketMaterial;
         int ticketCooldown;
