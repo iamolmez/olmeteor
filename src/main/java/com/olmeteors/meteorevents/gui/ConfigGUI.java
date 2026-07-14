@@ -21,6 +21,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -47,6 +48,7 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_DEBUG = 16;
     private static final int PAGE_HOLOGRAM_MENU = 17;
     private static final int PAGE_HOLOGRAM_EDIT = 18;
+    private static final int PAGE_STATS = 19;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -118,6 +120,8 @@ public final class ConfigGUI implements Listener {
         s.configOverrides = config.getConfig().getBoolean("locale-config-overrides", false);
         s.nbtEnabled = config.getConfig().getBoolean("integrations.nbt-api.enabled", true);
         s.hologramText = "";
+        s.statsTracking = config.isTrackingBossBarEnabled();
+        s.statsMaxDistance = config.getTrackingDistance();
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -155,11 +159,13 @@ public final class ConfigGUI implements Listener {
                 "&7Varsayılan şematik, geri yükleme, zaman aşımı"));
         s.inventory.setItem(17, item(Material.COMMAND_BLOCK, "&7Debug & Entegrasyon",
                 "&7Entegrasyon durumu, dil, NBT-API"));
+        s.inventory.setItem(18, item(Material.PLAYER_HEAD, "&6İstatistik Ayarları",
+                "&7Oyuncu istatistik takibi, mesafe sınırı"));
         s.inventory.setItem(19, item(Material.GLOW_ITEM_FRAME, "&bHologram & Görüntü",
                 "&7Hologram metinleri ve ekran ayarları"));
         // Dekoratif cam paneller (kalan boş slotlar)
         final ItemStack filler = item(Material.BLACK_STAINED_GLASS_PANE, "&8•");
-        for (final int slot : new int[]{18, 21}) {
+        for (final int slot : new int[]{21}) {
             s.inventory.setItem(slot, filler);
         }
     }
@@ -388,6 +394,7 @@ public final class ConfigGUI implements Listener {
             case PAGE_DEBUG -> handleDebugClick(s, slot, event);
             case PAGE_HOLOGRAM_MENU -> handleHologramMenuClick(s, slot, event);
             case PAGE_HOLOGRAM_EDIT -> handleHologramEditClick(s, slot, event);
+            case PAGE_STATS -> handleStatsClick(s, slot, event);
         }
     }
 
@@ -407,6 +414,7 @@ public final class ConfigGUI implements Listener {
         else if (slot == 17) drawDebugPage(s);
         else if (slot == 24) drawSchematicPage(s);
         else if (slot == 19) drawHologramMenuPage(s);
+        else if (slot == 18) drawStatsPage(s);
     }
 
     private void handleLocationClick(Session s, int slot, InventoryClickEvent event) {
@@ -1165,6 +1173,52 @@ public final class ConfigGUI implements Listener {
         player.openInventory(s.inventory);
     }
 
+    // ────────────────────────────────────────────────────────────────
+    //  STATS PAGE
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawStatsPage(Session s) {
+        s.page = PAGE_STATS;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet"));
+        // Tracking toggle
+        s.inventory.setItem(10, item(s.statsTracking ? Material.LIME_DYE : Material.GRAY_DYE,
+                "&eİstatistik Takibi: " + bool(s.statsTracking),
+                "&7Aktif: oyuncuların hasar/kasa/öldürme verileri kaydedilir",
+                "&7Kapalı: player-stats.yml güncellenmez",
+                "&7Tıkla aç/kapat"));
+        // Max tracking distance
+        s.inventory.setItem(11, item(Material.COMPASS,
+                "&eTakip Mesafesi: &f" + s.statsMaxDistance + " blok",
+                "&7Oyuncu event merkezinden bu mesafe içindeyse takip edilir",
+                "&7Sol/sağ: ±100 &7Shift: ±500"));
+        // Show current total tracked players count (read-only info)
+        final File statsFile = new File(plugin.getDataFolder(), "player-stats.yml");
+        final int trackedPlayers = statsFile.exists()
+                ? java.util.Optional.ofNullable(
+                        org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(statsFile)
+                                .getConfigurationSection("players"))
+                        .map(section -> section.getKeys(false).size())
+                        .orElse(0)
+                : 0;
+        s.inventory.setItem(13, item(Material.BOOK,
+                "&7Kayıtlı Oyuncu: &f" + trackedPlayers,
+                "&7player-stats.yml dosyasındaki toplam oyuncu sayısı",
+                "&7Her oyuncu: hasar, öldürme, sandık, sıralama ödülü"));
+    }
+
+    private void handleStatsClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); drawMainMenu(s); return; }
+        final boolean right = event.isRightClick();
+        final boolean shift = event.isShiftClick();
+        if (slot == 10) s.statsTracking = !s.statsTracking;
+        else if (slot == 11) s.statsMaxDistance = clamp(s.statsMaxDistance + (shift ? 500 : 100) * (right ? -1 : 1), 32, 10000);
+        drawStatsPage(s);
+    }
+
     private void cycleLocale(Session s, int delta) {
         int idx = 0;
         for (int i = 0; i < LOCALES.length; i++) {
@@ -1344,6 +1398,9 @@ public final class ConfigGUI implements Listener {
             fileConfig.set("locale-config-overrides", s.configOverrides);
             fileConfig.set("integrations.nbt-api.enabled", s.nbtEnabled);
         }
+        // Stats
+        fileConfig.set("event.tracking.enabled", s.statsTracking);
+        fileConfig.set("event.tracking.max-distance", s.statsMaxDistance);
         // Hologram & Display
         if (s.hologramEdited && s.editingType != null) {
             final String base = "meteor-types." + s.editingType.name().toLowerCase(Locale.ROOT) + ".";
@@ -1595,5 +1652,8 @@ public final class ConfigGUI implements Listener {
         String hologramText;
         boolean editRestoreStructure;
         String editSchematicOverride;
+        // Stats
+        boolean statsTracking;
+        int statsMaxDistance;
     }
 }
