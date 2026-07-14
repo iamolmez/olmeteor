@@ -41,6 +41,9 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_REWARDS_MENU = 10;
     private static final int PAGE_REWARDS_EDIT = 11;
     private static final int PAGE_TICKET = 12;
+    private static final int PAGE_MOBS_MENU = 13;
+    private static final int PAGE_MOBS_EDIT = 14;
+    private static final int PAGE_SCHEMATIC = 15;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -51,6 +54,7 @@ public final class ConfigGUI implements Listener {
     private final ConfigManager config;
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, RewardsChatContext> rewardsChatContexts = new ConcurrentHashMap<>();
+    private final Map<UUID, MobsChatContext> mobsChatContexts = new ConcurrentHashMap<>();
 
     public ConfigGUI(MeteorPlugin plugin) {
         this.plugin = plugin;
@@ -102,6 +106,10 @@ public final class ConfigGUI implements Listener {
                 config.getConfig().getString("event.vault.loot-block", "ANCIENT_DEBRIS"));
         s.ticketMaterial = config.getConfig().getString("event.tickets.material", "FIRE_CHARGE");
         s.ticketCooldown = config.getConfig().getInt("event.tickets.cooldown-seconds", 300);
+        s.recoveryEnabled = config.isCrashRecoveryEnabled();
+        s.cleanupDelay = config.getCompletionCleanupDelaySeconds();
+        s.unattendedTimeout = config.getUnattendedTimeoutMinutes();
+        s.chunkRadius = config.getChunkForceLoadRadius();
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -129,10 +137,14 @@ public final class ConfigGUI implements Listener {
                 "&7Aralık, TPS koruması, konum soğuması"));
         s.inventory.setItem(16, item(Material.FIRE_CHARGE, "&dMeteor Türleri",
                 "&7Her tür için yarıçap, boss, süre"));
+        s.inventory.setItem(20, item(Material.ZOMBIE_HEAD, "&aMob Ayarları",
+                "&7MythicMobs listesi ve spawn offsetleri"));
         s.inventory.setItem(22, item(Material.CHEST, "&6Loot Ayarları",
                 "&7Her tür için loot bloğu, erişim modu, kişisel/ortak"));
         s.inventory.setItem(23, item(Material.BOOK, "&6Ödül Ayarları",
                 "&7Ödül komutları ve sıralama ödülleri"));
+        s.inventory.setItem(24, item(Material.FILLED_MAP, "&8Şematik & Geri Yükleme",
+                "&7Varsayılan şematik, geri yükleme, zaman aşımı"));
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -353,6 +365,9 @@ public final class ConfigGUI implements Listener {
             case PAGE_REWARDS_MENU -> handleRewardsMenuClick(s, slot, event);
             case PAGE_REWARDS_EDIT -> handleRewardsEditClick(s, slot, event);
             case PAGE_TICKET -> handleTicketClick(s, slot, event);
+            case PAGE_MOBS_MENU -> handleMobsMenuClick(s, slot, event);
+            case PAGE_MOBS_EDIT -> handleMobsEditClick(s, slot, event);
+            case PAGE_SCHEMATIC -> handleSchematicClick(s, slot, event);
         }
     }
 
@@ -366,8 +381,10 @@ public final class ConfigGUI implements Listener {
         else if (slot == 14) drawFallVaultPage(s);
         else if (slot == 15) drawAutoPage(s);
         else if (slot == 16) drawTypesMenu(s);
+        else if (slot == 20) drawMobsMenuPage(s);
         else if (slot == 22) drawLootMenuPage(s);
         else if (slot == 23) drawRewardsMenuPage(s);
+        else if (slot == 24) drawSchematicPage(s);
     }
 
     private void handleLocationClick(Session s, int slot, InventoryClickEvent event) {
@@ -713,6 +730,217 @@ public final class ConfigGUI implements Listener {
             "MAGMA_CREAM", "GHAST_TEAR", "PHANTOM_MEMBRANE", "ECHO_SHARD", "AMETHYST_SHARD",
             "EXPERIENCE_BOTTLE", "BOOK", "ENCHANTED_BOOK"};
 
+    // ────────────────────────────────────────────────────────────────
+    //  MOBS PAGES
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawMobsMenuPage(Session s) {
+        s.page = PAGE_MOBS_MENU;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        int slot = 10;
+        for (MeteorType type : MeteorType.values()) {
+            if (slot >= 35) break;
+            final int mobCount = config.getTypeConfig(type).mythicMobs().size();
+            final int offsetCount = config.getMobSpawnOffsets(type).size();
+            s.inventory.setItem(slot++, item(Material.ZOMBIE_HEAD,
+                    config.getMeteorTypeColor(type) + config.getMeteorTypeName(type),
+                    "&7Mob: &f" + mobCount + " adet",
+                    "&7Spawn offset: &f" + offsetCount + " adet",
+                    "&7&lTıkla düzenle"));
+        }
+    }
+
+    private void drawMobsEditPage(Session s) {
+        s.page = PAGE_MOBS_EDIT;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Mob Menüsü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        final MeteorType type = s.editingType;
+        if (type == null) return;
+        final List<String> mobs = s.mobsEdited
+                ? s.editMobs : config.getTypeConfig(type).mythicMobs();
+        final int offsetCount = config.getMobSpawnOffsets(type).size();
+        final int availableMobs = plugin.getMythicMobsHook().getMobIds().size();
+        final var bossId = config.getTypeConfig(type).bossMythicMob();
+        final List<String> mobLore = new ArrayList<>();
+        mobLore.add("&7&lSayı: &f" + mobs.size());
+        if (mobs.isEmpty()) {
+            mobLore.add("&7Henüz mob eklenmemiş");
+        } else {
+            mobs.stream().limit(6).forEach(m -> mobLore.add("&7- " + m));
+        }
+        s.inventory.setItem(10, item(Material.SPAWNER,
+                "&aYapılandırılmış Moblar",
+                mobLore.toArray(new String[0])));
+        s.inventory.setItem(11, item(Material.ENDER_PEARL,
+                "&5Spawn Offsetleri: &f" + offsetCount + " adet",
+                "&7Kurulumdan gelen mob spawn noktaları",
+                "&7Düzenlemek için oyun içi kurulumu kullan"));
+        s.inventory.setItem(12, item(Material.BOOK,
+                "&7Sunucuda Mevcut MythicMobs: &f" + availableMobs,
+                "&7Mob eklemek için MythicMobs ID'sini kullan",
+                "&7Sol/sağ tıkla düzenle (sohbet)"));
+        s.inventory.setItem(14, item(Material.BLAZE_ROD,
+                "&cBoss Mob: &f" + (bossId.isEmpty() ? "&7Yok" : bossId),
+                "&7Meteor Türü sayfasında düzenlenebilir"));
+    }
+
+    private void handleMobsMenuClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        final int typeIndex = slot - 10;
+        final MeteorType[] types = MeteorType.values();
+        if (typeIndex >= 0 && typeIndex < types.length) {
+            s.editingType = types[typeIndex];
+            s.mobsEdited = false;
+            s.editMobs.clear();
+            s.editMobs.addAll(config.getTypeConfig(s.editingType).mythicMobs());
+            drawMobsEditPage(s);
+        }
+    }
+
+    private void handleMobsEditClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMobsMenuPage(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        if (slot == 10 || slot == 12) {
+            final Player player = (Player) event.getWhoClicked();
+            final String label = "MythicMobs";
+            final MobsChatContext ctx = new MobsChatContext(s, s.editingType);
+            mobsChatContexts.put(player.getUniqueId(), ctx);
+            player.closeInventory();
+            MessageUtil.sendMessage(player, "");
+            MessageUtil.sendMessage(player, "&6&l✦ " + label + " düzenle");
+            MessageUtil.sendMessage(player, "&7Eklemek için: &fmobId");
+            MessageUtil.sendMessage(player, "&7Çıkarmak için: &f-mobId");
+            MessageUtil.sendMessage(player, "&7Mevcut mobları görmek için: &flist");
+            MessageUtil.sendMessage(player, "&7Bitince: &fdone");
+            MessageUtil.sendMessage(player, "&7Sunucudaki tüm moblar: &f/olmeteor debug");
+            MessageUtil.sendMessage(player, "");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  MOBS CHAT EDIT
+    // ────────────────────────────────────────────────────────────────
+
+    private record MobsChatContext(@NotNull Session session, @NotNull MeteorType type) {}
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onMobsChat(AsyncPlayerChatEvent event) {
+        final Player player = event.getPlayer();
+        final MobsChatContext ctx = mobsChatContexts.get(player.getUniqueId());
+        if (ctx == null) return;
+        event.setCancelled(true);
+        final String input = event.getMessage().trim();
+        plugin.getFoliaScheduler().callGlobal(() ->
+                processMobsChatInput(player, ctx, input));
+    }
+
+    private void processMobsChatInput(Player player, MobsChatContext ctx, String input) {
+        try {
+            mobsChatContexts.remove(player.getUniqueId());
+            if (input.equalsIgnoreCase("done") || input.equalsIgnoreCase("cancel")
+                    || input.equalsIgnoreCase("exit") || input.equals("0")) {
+                reopenMobsEditor(player, ctx);
+                return;
+            }
+            if (input.equalsIgnoreCase("list")) {
+                final List<String> currentMobs = ctx.session.editMobs;
+                if (currentMobs.isEmpty()) {
+                    MessageUtil.sendMessage(player, "&7Henüz mob eklenmemiş.");
+                } else {
+                    MessageUtil.sendMessage(player, "&6Mevcut moblar:");
+                    currentMobs.forEach(m -> MessageUtil.sendMessage(player, "&7- &f" + m));
+                }
+                mobsChatContexts.put(player.getUniqueId(), ctx);
+                return;
+            }
+            final boolean isRemove = input.startsWith("-");
+            final String value = (isRemove || input.startsWith("+"))
+                    ? input.substring(1).trim() : input.trim();
+            if (value.isEmpty()) {
+                MessageUtil.sendMessage(player, "&cGeçersiz giriş.");
+                reopenMobsEditor(player, ctx);
+                return;
+            }
+            if (isRemove) {
+                final boolean removed = ctx.session.editMobs.remove(value);
+                if (removed) {
+                    MessageUtil.sendMessage(player, "&aKaldırıldı: &f" + value);
+                } else {
+                    MessageUtil.sendMessage(player, "&eBulunamadı: &f" + value);
+                }
+            } else {
+                ctx.session.editMobs.add(value);
+                MessageUtil.sendMessage(player, "&aEklendi: &f" + value);
+            }
+            ctx.session.mobsEdited = true;
+            reopenMobsEditor(player, ctx);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Mobs chat input error: " + e.getMessage());
+            mobsChatContexts.remove(player.getUniqueId());
+        }
+    }
+
+    private void reopenMobsEditor(Player player, MobsChatContext ctx) {
+        final Session s = ctx.session;
+        s.editingType = ctx.type;
+        s.inventory = Bukkit.createInventory(null, 54,
+                MessageUtil.parse("&6&lOlMeteor &8• &eConfig Ayarları"));
+        sessions.put(player.getUniqueId(), s);
+        drawMobsEditPage(s);
+        player.openInventory(s.inventory);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  SCHEMATIC & RECOVERY PAGE
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawSchematicPage(Session s) {
+        s.page = PAGE_SCHEMATIC;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet"));
+        final String defaultSchem = config.getConfig().getString("schematic.default", "meteor_crater.schem");
+        final boolean schemExists = config.schematicExists(defaultSchem);
+        s.inventory.setItem(10, item(Material.FILLED_MAP,
+                "&7Varsayılan Şematik: &f" + defaultSchem,
+                schemExists ? "&aDosya mevcut" : "&cDosya bulunamadı!",
+                "&7Her tür için özelleştirme: Meteor Türleri sayfası"));
+        s.inventory.setItem(11, item(s.recoveryEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
+                "&eÇökme Kurtarma: " + bool(s.recoveryEnabled),
+                "&7Sunucu çökmesi sonrası yarım kalan meteorları geri yükler",
+                "&7Tıkla aç/kapat"));
+        s.inventory.setItem(12, item(Material.REPEATER,
+                "&eTemizlik Gecikmesi: &f" + s.cleanupDelay + " sn",
+                "&7Tüm moblar öldükten sonra alanın silinme süresi",
+                "&7Sol/sağ: ±10"));
+        s.inventory.setItem(13, item(Material.CLOCK,
+                "&eSahipsiz Zaman Aşımı: &f" + s.unattendedTimeout + " dk",
+                "&7Hiç oyuncu gelmezse eventin iptal edilme süresi",
+                "&7Sol/sağ: ±5"));
+        s.inventory.setItem(14, item(Material.CHORUS_FRUIT,
+                "&eChunk Yükleme Yarıçapı: &f" + s.chunkRadius + " chunk",
+                "&7Event alanındaki force-load chunk sayısı",
+                "&7Sol/sağ: ±1"));
+    }
+
+    private void handleSchematicClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); drawMainMenu(s); return; }
+        final boolean right = event.isRightClick();
+        if (slot == 11) s.recoveryEnabled = !s.recoveryEnabled;
+        else if (slot == 12) s.cleanupDelay = clamp(s.cleanupDelay + (right ? -10 : 10), 10, 600);
+        else if (slot == 13) s.unattendedTimeout = clamp(s.unattendedTimeout + (right ? -5 : 5), 1, 120);
+        else if (slot == 14) s.chunkRadius = clamp(s.chunkRadius + (right ? -1 : 1), 1, 10);
+        drawSchematicPage(s);
+    }
+
     private void changeTicketMaterial(Session s, ItemStack cursor, int delta) {
         if (cursor != null && !cursor.isEmpty() && cursor.getType().isItem()) {
             s.ticketMaterial = cursor.getType().name();
@@ -861,6 +1089,23 @@ public final class ConfigGUI implements Listener {
             fileConfig.set(base + "ranking-rewards." + s.editRank + ".items",
                     new ArrayList<>(s.editRankItems));
         }
+        // Mobs
+        if (s.mobsEdited && s.editingType != null) {
+            final String base = "meteor-types." + s.editingType.name().toLowerCase(Locale.ROOT) + ".";
+            fileConfig.set(base + "mythicmobs", new ArrayList<>(s.editMobs));
+            // Also update mythicmob-chances (set default 50% for new, remove for deleted)
+            final Map<String, Double> existingChances = config.getMythicMobChances(s.editingType);
+            final Map<String, Double> newChances = new LinkedHashMap<>();
+            for (final String mobId : s.editMobs) {
+                newChances.put(mobId, existingChances.getOrDefault(mobId, 50.0));
+            }
+            config.setMythicMobChances(s.editingType, newChances);
+        }
+        // Schematic & Recovery
+        fileConfig.set("event.recovery.enabled", s.recoveryEnabled);
+        fileConfig.set("event.completion.cleanup-delay-seconds", s.cleanupDelay);
+        fileConfig.set("event.completion.unattended-timeout-minutes", s.unattendedTimeout);
+        fileConfig.set("event.chunk-force-load-radius", s.chunkRadius);
         // Save to disk
         try {
             fileConfig.save(new java.io.File(plugin.getDataFolder(), "config.yml"));
@@ -1088,8 +1333,14 @@ public final class ConfigGUI implements Listener {
         List<String> editGeneralItems = new ArrayList<>();
         List<String> editRankCmds = new ArrayList<>();
         List<String> editRankItems = new ArrayList<>();
+        // Mobs edit
+        boolean mobsEdited;
+        List<String> editMobs = new ArrayList<>();
         // Ticket
         String ticketMaterial;
         int ticketCooldown;
+        // Schematic & Recovery
+        boolean recoveryEnabled;
+        int cleanupDelay, unattendedTimeout, chunkRadius;
     }
 }
