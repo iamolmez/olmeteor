@@ -11,6 +11,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  administration: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -62,6 +63,8 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Prepare Pages output
         run: |
