@@ -8,7 +8,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -47,35 +49,163 @@ jobs:
           retention-days: 30
 
   deploy-wiki:
-    name: Deploy Wiki
+    name: Deploy Wiki (GitHub Pages)
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout GitHub Wiki
-        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare Pages output
+        run: |
+          mkdir -p _site/wiki/en
+
+          # Kopyala: wiki dosyalari
+          cp -r wiki/*.md _site/wiki/
+          cp -r wiki/en/*.md _site/wiki/en/
+          cp -r wiki/en/_Sidebar.md _site/wiki/en/
+
+          # Ana sayfayi kokten ver
+          cp wiki/Home.md _site/index.md
+
+          # .nojekyll ile Jekyll'i devre disi birak
+          touch _site/.nojekyll
+
+          # HTML karsilama sayfasi
+          cat > _site/index.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OlMeteor Wiki</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .container { max-width: 800px; width: 100%; text-align: center; }
+  h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #f093fb, #f5576c, #4facfe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.5rem;
+  }
+  .subtitle { font-size: 1.1rem; color: #a0a0c0; margin-bottom: 2rem; }
+  .lang-section {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .lang-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .lang-section h2 { font-size: 1.5rem; margin-bottom: 1rem; }
+  .lang-section h2 .flag { margin-right: 0.5rem; }
+  .lang-section p { color: #b0b0d0; margin-bottom: 1.2rem; font-size: 0.95rem; }
+  .btn {
+    display: inline-block;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+    margin: 0.3rem;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(245,87,108,0.4);
+  }
+  .btn-secondary {
+    background: rgba(255,255,255,0.1);
+    color: #e0e0e0;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .btn-secondary:hover {
+    background: rgba(255,255,255,0.2);
+    transform: scale(1.05);
+  }
+  .footer {
+    margin-top: 2rem;
+    font-size: 0.85rem;
+    color: #606080;
+  }
+  .footer a { color: #8a8ab0; text-decoration: none; }
+  .footer a:hover { color: #f093fb; }
+  .version-badge {
+    display: inline-block;
+    background: rgba(79,172,254,0.2);
+    border: 1px solid rgba(79,172,254,0.3);
+    color: #4facfe;
+    padding: 0.2rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 1rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>☄️ OlMeteor</h1>
+  <p class="subtitle">Fully customizable meteor event plugin for Paper &amp; Folia</p>
+
+  <div class="lang-section">
+    <h2><span class="flag">🇹🇷</span> Türkçe Wiki</h2>
+    <p>OlMeteor plugininin tüm özelliklerini, komutlarını ve yapılandırma ayarlarını detaylıca anlatan Türkçe dokümantasyon.</p>
+    <a href="wiki/Home.md" class="btn btn-primary">Türkçe Wiki'ye Git</a>
+    <a href="wiki/Index.md" class="btn btn-secondary">Tüm Sayfalar</a>
+  </div>
+
+  <div class="lang-section">
+    <h2><span class="flag">🇬🇧</span> English Wiki</h2>
+    <p>Complete English documentation covering all features, commands, and configuration of the OlMeteor plugin.</p>
+    <a href="wiki/en/Home.md" class="btn btn-primary">Go to English Wiki</a>
+    <a href="wiki/Index.md" class="btn btn-secondary">All Pages</a>
+  </div>
+
+  <div class="version-badge">v1.3.0</div>
+
+  <div class="footer">
+    <p><a href="https://github.com/iamolmez/olmeteor">GitHub</a> &middot; OlMeteor by iamolmez</p>
+  </div>
+</div>
+</body>
+</html>
+HTMLEOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          repository: ${{ github.repository }}.wiki
-          path: wiki-pages
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: 'master'
+          path: _site
 
-      - name: Sync wiki files
-        run: |
-          rsync -av --delete --exclude='.git' wiki/ wiki-pages/
-
-      - name: Commit and push changes
-        run: |
-          cd wiki-pages
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to deploy"
-            exit 0
-          fi
-          git commit -m "Auto-deploy wiki: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          git push
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

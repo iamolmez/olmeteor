@@ -30,3 +30,6 @@ nul
 # Backup
 *.bak
 *.backup
+
+# Test project (separate Gradle project)
+test-project/
