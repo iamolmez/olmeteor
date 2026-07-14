@@ -122,6 +122,15 @@ public final class ConfigGUI implements Listener {
         s.hologramText = "";
         s.statsTracking = config.isTrackingBossBarEnabled();
         s.statsMaxDistance = config.getTrackingDistance();
+        // Load tracked player count once (not on every draw)
+        final File statsFile = new File(plugin.getDataFolder(), "player-stats.yml");
+        s.trackedPlayerCount = statsFile.exists()
+                ? java.util.Optional.ofNullable(
+                        org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(statsFile)
+                                .getConfigurationSection("players"))
+                        .map(section -> section.getKeys(false).size())
+                        .orElse(0)
+                : 0;
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -1194,17 +1203,9 @@ public final class ConfigGUI implements Listener {
                 "&eTakip Mesafesi: &f" + s.statsMaxDistance + " blok",
                 "&7Oyuncu event merkezinden bu mesafe içindeyse takip edilir",
                 "&7Sol/sağ: ±100 &7Shift: ±500"));
-        // Show current total tracked players count (read-only info)
-        final File statsFile = new File(plugin.getDataFolder(), "player-stats.yml");
-        final int trackedPlayers = statsFile.exists()
-                ? java.util.Optional.ofNullable(
-                        org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(statsFile)
-                                .getConfigurationSection("players"))
-                        .map(section -> section.getKeys(false).size())
-                        .orElse(0)
-                : 0;
+        // Tracked player count (loaded once on session init)
         s.inventory.setItem(13, item(Material.BOOK,
-                "&7Kayıtlı Oyuncu: &f" + trackedPlayers,
+                "&7Kayıtlı Oyuncu: &f" + s.trackedPlayerCount,
                 "&7player-stats.yml dosyasındaki toplam oyuncu sayısı",
                 "&7Her oyuncu: hasar, öldürme, sandık, sıralama ödülü"));
     }
@@ -1655,5 +1656,6 @@ public final class ConfigGUI implements Listener {
         // Stats
         boolean statsTracking;
         int statsMaxDistance;
+        int trackedPlayerCount;
     }
 }
