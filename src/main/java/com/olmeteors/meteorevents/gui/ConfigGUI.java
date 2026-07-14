@@ -29,14 +29,13 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_MAIN = 0;
     private static final int PAGE_LOCATION = 1;
     private static final int PAGE_HAZARDS = 2;
-    private static final int PAGE_WAVES = 3;
-    private static final int PAGE_COMBAT = 4;
-    private static final int PAGE_FALL_VAULT = 5;
-    private static final int PAGE_AUTO = 6;
-    private static final int PAGE_TYPES_MENU = 7;
-    private static final int PAGE_TYPE_EDIT = 8;
-    private static final int PAGE_LOOT_MENU = 9;
-    private static final int PAGE_LOOT_EDIT = 10;
+    private static final int PAGE_COMBAT = 3;
+    private static final int PAGE_FALL_VAULT = 4;
+    private static final int PAGE_AUTO = 5;
+    private static final int PAGE_TYPES_MENU = 6;
+    private static final int PAGE_TYPE_EDIT = 7;
+    private static final int PAGE_LOOT_MENU = 8;
+    private static final int PAGE_LOOT_EDIT = 9;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -75,8 +74,6 @@ public final class ConfigGUI implements Listener {
         s.windInterval = config.getWindChargeInterval();
         s.disableElytra = config.isElytraDisabled();
         s.disablePearl = config.isEnderPearlDisabled();
-        s.waveCount = config.getWaveCount(MeteorType.SMALL);
-        s.waveInterval = config.getWaveIntervalSeconds(MeteorType.SMALL);
         s.damageBar = config.isDamageActionBarEnabled(MeteorType.SMALL);
         s.killBar = config.isKillActionBarEnabled(MeteorType.SMALL);
         s.leaderboard = config.isLeaderboardBroadcastEnabled(MeteorType.SMALL);
@@ -114,9 +111,7 @@ public final class ConfigGUI implements Listener {
                 "&7Preset, mesafe, tampon bölge, WorldGuard, Towny"));
         s.inventory.setItem(11, item(Material.TNT, "&cTehlike Ayarları",
                 "&7Radyasyon hasarı, yel itme şiddeti, EMP"));
-        s.inventory.setItem(12, item(Material.WATER_BUCKET, "&3Dalga Ayarları",
-                "&7Dalga sayısı ve aralık süresi"));
-        s.inventory.setItem(13, item(Material.DIAMOND_SWORD, "&6Savaş Ayarları",
+        s.inventory.setItem(12, item(Material.DIAMOND_SWORD, "&6Savaş Ayarları",
                 "&7Hasar sıralaması, actionbar mesajları"));
         s.inventory.setItem(14, item(Material.ANVIL, "&eDüşüş & Sandık",
                 "&7Düşüş yüksekliği, sandık gecikmesi, eşik"));
@@ -179,22 +174,6 @@ public final class ConfigGUI implements Listener {
         s.inventory.setItem(15, item(s.disablePearl ? Material.LIME_DYE : Material.GRAY_DYE,
                 "&eEnder İncisi Engelle: " + bool(s.disablePearl),
                 "&7Tıkla aç/kapat"));
-    }
-
-    // ────────────────────────────────────────────────────────────────
-    //  WAVES PAGE
-    // ────────────────────────────────────────────────────────────────
-
-    private void drawWavesPage(Session s) {
-        s.page = PAGE_WAVES;
-        s.inventory.clear();
-        fillBorder(s);
-        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
-        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet"));
-        s.inventory.setItem(10, item(Material.ZOMBIE_HEAD, "&aDalga Sayısı: &f" + s.waveCount,
-                "&7Sol/sağ: ±1 &7Shift: ±5"));
-        s.inventory.setItem(11, item(Material.CLOCK, "&aDalga Aralığı: &f" + s.waveInterval + " sn",
-                "&7Sol/sağ: ±5"));
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -352,7 +331,6 @@ public final class ConfigGUI implements Listener {
             case PAGE_MAIN -> handleMainClick(s, slot, event);
             case PAGE_LOCATION -> handleLocationClick(s, slot, event);
             case PAGE_HAZARDS -> handleHazardsClick(s, slot, event);
-            case PAGE_WAVES -> handleWavesClick(s, slot, event);
             case PAGE_COMBAT -> handleCombatClick(s, slot, event);
             case PAGE_FALL_VAULT -> handleFallVaultClick(s, slot, event);
             case PAGE_AUTO -> handleAutoClick(s, slot, event);
@@ -368,8 +346,7 @@ public final class ConfigGUI implements Listener {
         else if (slot == CLOSE_SLOT) close(s, event);
         else if (slot == 10) drawLocationPage(s);
         else if (slot == 11) drawHazardsPage(s);
-        else if (slot == 12) drawWavesPage(s);
-        else if (slot == 13) drawCombatPage(s);
+        else if (slot == 12) drawCombatPage(s);
         else if (slot == 14) drawFallVaultPage(s);
         else if (slot == 15) drawAutoPage(s);
         else if (slot == 16) drawTypesMenu(s);
@@ -402,16 +379,6 @@ public final class ConfigGUI implements Listener {
         else if (slot == 14) s.disableElytra = !s.disableElytra;
         else if (slot == 15) s.disablePearl = !s.disablePearl;
         drawHazardsPage(s);
-    }
-
-    private void handleWavesClick(Session s, int slot, InventoryClickEvent event) {
-        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
-        if (slot == SAVE_SLOT) { saveAll(s); drawMainMenu(s); return; }
-        final boolean right = event.isRightClick();
-        final boolean shift = event.isShiftClick();
-        if (slot == 10) s.waveCount = clamp(s.waveCount + (shift ? 5 : 1) * (right ? -1 : 1), 1, 50);
-        else if (slot == 11) s.waveInterval = clamp(s.waveInterval + (right ? -5 : 5), 1, 300);
-        drawWavesPage(s);
     }
 
     private void handleCombatClick(Session s, int slot, InventoryClickEvent event) {
@@ -681,9 +648,6 @@ public final class ConfigGUI implements Listener {
         fileConfig.set("event.hazards.wind-charge-interval-ticks", s.windInterval);
         fileConfig.set("event.hazards.disable-elytra", s.disableElytra);
         fileConfig.set("event.hazards.disable-ender-pearl", s.disablePearl);
-        // Waves
-        fileConfig.set("event.waves.count", s.waveCount);
-        fileConfig.set("event.waves.interval-seconds", s.waveInterval);
         // Combat
         fileConfig.set("event.combat-feedback.damage-actionbar", s.damageBar);
         fileConfig.set("event.combat-feedback.kill-actionbar", s.killBar);
@@ -798,8 +762,6 @@ public final class ConfigGUI implements Listener {
         int radiation, windInterval;
         double windKnockback;
         boolean disableElytra, disablePearl;
-        // Waves
-        int waveCount, waveInterval;
         // Combat
         boolean damageBar, killBar, leaderboard;
         int leaderboardSize, rewardTopCount;
