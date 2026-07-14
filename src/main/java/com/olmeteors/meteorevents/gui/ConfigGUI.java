@@ -302,13 +302,14 @@ public final class ConfigGUI implements Listener {
         s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
         final MeteorType type = s.editingType;
         if (type == null) return;
-        final var tc = config.getTypeConfig(type);
         s.inventory.setItem(10, item(Material.STONE, "&7Yarıçap: &f" + s.editRadius,
                 "&7Çarpma alanı yarıçapı", "&7Sol/sağ: ±5 &7Shift: ±10"));
         s.inventory.setItem(11, item(Material.COMPASS, "&7Yarıçap Şekli: &f" + s.editShape.name(),
                 "&7Sol/sağ tıkla değiştir"));
         s.inventory.setItem(12, item(Material.IRON_SWORD, "&7Boss Çarpanı: &f" + s.editBossMult + "x",
                 "&7Sol/sağ: ±0.1 &7Shift: ±0.5"));
+        s.inventory.setItem(13, item(Material.ZOMBIE_HEAD, "&7Boss Mob: &f" + (s.editBossMobId.isEmpty() ? "&7Yok" : s.editBossMobId),
+                "&7MythicMobs boss ID", "&7Sol/sağ tıkla değiştir"));
         s.inventory.setItem(14, item(Material.ANVIL, "&7Ön Süre: &f" + s.editPreImpact + " sn",
                 "&7Çarpma öncesi uyarı süresi", "&7Sol/sağ: ±10"));
         s.inventory.setItem(15, item(Material.FIRE_CHARGE, "&7Etkinlik Süresi: &f" + s.editDuration + " sn",
@@ -321,6 +322,10 @@ public final class ConfigGUI implements Listener {
                 "&7Sol/sağ: ±2"));
         s.inventory.setItem(22, item(Material.ELYTRA, "&7Yavaş Düşüş: &f" + s.editSlowFall + " sn",
                 "&7Sol/sağ: ±2"));
+        s.inventory.setItem(23, item(Material.ZOMBIE_HEAD, "&aDalga Sayısı: &f" + s.editWaveCount,
+                "&7Bu tür için dalga sayısı", "&7Sol/sağ: ±1 &7Shift: ±5"));
+        s.inventory.setItem(24, item(Material.CLOCK, "&aDalga Aralığı: &f" + s.editWaveInterval + " sn",
+                "&7Sol/sağ: ±5"));
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -454,12 +459,15 @@ public final class ConfigGUI implements Listener {
             s.editRadius = tc.impactRadius();
             s.editShape = config.getRadiusShape(s.editingType);
             s.editBossMult = tc.bossHealthMultiplier();
+            s.editBossMobId = tc.bossMythicMob();
             s.editPreImpact = tc.preImpactDurationSeconds();
             s.editDuration = tc.eventDurationSeconds();
             s.editRollback = tc.rollbackDurationSeconds();
             s.editFallMode = config.getFallMode(s.editingType);
             s.editNormalFall = config.getFallDurationSeconds(s.editingType, MeteorFallMode.NORMAL);
             s.editSlowFall = config.getFallDurationSeconds(s.editingType, MeteorFallMode.SLOW);
+            s.editWaveCount = config.getWaveCount(s.editingType);
+            s.editWaveInterval = config.getWaveIntervalSeconds(s.editingType);
             drawTypeEditPage(s);
         }
     }
@@ -472,12 +480,15 @@ public final class ConfigGUI implements Listener {
         if (slot == 10) s.editRadius = clamp(s.editRadius + (shift ? 10 : 5) * (right ? -1 : 1), 5, 500);
         else if (slot == 11) cycleShape(s, right ? -1 : 1);
         else if (slot == 12) s.editBossMult = Math.round(clamp(s.editBossMult + (shift ? 0.5 : 0.1) * (right ? -1 : 1), 0, 50) * 10.0) / 10.0;
+        else if (slot == 13) cycleBossMob(s, right ? -1 : 1);
         else if (slot == 14) s.editPreImpact = clamp(s.editPreImpact + (right ? -10 : 10), 5, 600);
         else if (slot == 15) s.editDuration = clamp(s.editDuration + (right ? -30 : 30), 30, 3600);
         else if (slot == 16) s.editRollback = clamp(s.editRollback + (right ? -10 : 10), 5, 600);
         else if (slot == 20) cycleFallMode(s, right ? -1 : 1);
         else if (slot == 21) s.editNormalFall = clamp(s.editNormalFall + (right ? -2 : 2), 2, 120);
         else if (slot == 22) s.editSlowFall = clamp(s.editSlowFall + (right ? -2 : 2), 5, 120);
+        else if (slot == 23) s.editWaveCount = clamp(s.editWaveCount + (shift ? 5 : 1) * (right ? -1 : 1), 1, 50);
+        else if (slot == 24) s.editWaveInterval = clamp(s.editWaveInterval + (right ? -5 : 5), 1, 300);
         drawTypeEditPage(s);
     }
 
@@ -501,6 +512,19 @@ public final class ConfigGUI implements Listener {
     private void cycleFallMode(Session s, int delta) {
         final MeteorFallMode[] modes = MeteorFallMode.values();
         s.editFallMode = modes[Math.floorMod(s.editFallMode.ordinal() + delta, modes.length)];
+    }
+
+    private void cycleBossMob(Session s, int delta) {
+        final List<String> mobIds = plugin.getMythicMobsHook().getMobIds();
+        if (mobIds.isEmpty()) { s.editBossMobId = ""; return; }
+        if (s.editBossMobId == null || s.editBossMobId.isEmpty()) {
+            s.editBossMobId = delta > 0 ? mobIds.getFirst() : "";
+            return;
+        }
+        int idx = mobIds.indexOf(s.editBossMobId);
+        if (idx < 0) { s.editBossMobId = mobIds.getFirst(); return; }
+        final int next = Math.floorMod(idx + delta, mobIds.size() + 1);
+        s.editBossMobId = next == mobIds.size() ? "" : mobIds.get(next);
     }
 
     private static final Material[] LOOT_BLOCKS = {Material.CHEST, Material.BARREL,
@@ -606,12 +630,15 @@ public final class ConfigGUI implements Listener {
         fileConfig.set(base + "impact-radius", s.editRadius);
         fileConfig.set(base + "radius-shape", s.editShape.name());
         fileConfig.set(base + "boss-health-multiplier", s.editBossMult);
+        fileConfig.set(base + "boss-mythicmob", s.editBossMobId);
         fileConfig.set(base + "pre-impact-duration-seconds", s.editPreImpact);
         fileConfig.set(base + "event-duration-seconds", s.editDuration);
         fileConfig.set(base + "rollback-duration-seconds", s.editRollback);
         fileConfig.set(base + "fall-mode", s.editFallMode.name().toLowerCase(Locale.ROOT));
         fileConfig.set(base + "normal-fall-duration-seconds", s.editNormalFall);
         fileConfig.set(base + "slow-fall-duration-seconds", s.editSlowFall);
+        fileConfig.set(base + "waves.count", s.editWaveCount);
+        fileConfig.set(base + "waves.interval-seconds", s.editWaveInterval);
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -676,7 +703,9 @@ public final class ConfigGUI implements Listener {
         // Type edit
         MeteorType editingType;
         int editRadius, editPreImpact, editDuration, editRollback, editNormalFall, editSlowFall;
+        int editWaveCount, editWaveInterval;
         double editBossMult;
+        String editBossMobId;
         RadiusShape editShape;
         MeteorFallMode editFallMode;
     }
