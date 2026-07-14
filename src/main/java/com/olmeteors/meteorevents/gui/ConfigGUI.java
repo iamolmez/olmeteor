@@ -45,6 +45,8 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_MOBS_EDIT = 14;
     private static final int PAGE_SCHEMATIC = 15;
     private static final int PAGE_DEBUG = 16;
+    private static final int PAGE_HOLOGRAM_MENU = 17;
+    private static final int PAGE_HOLOGRAM_EDIT = 18;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -56,6 +58,7 @@ public final class ConfigGUI implements Listener {
     private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, RewardsChatContext> rewardsChatContexts = new ConcurrentHashMap<>();
     private final Map<UUID, MobsChatContext> mobsChatContexts = new ConcurrentHashMap<>();
+    private final Map<UUID, HologramChatContext> hologramChatContexts = new ConcurrentHashMap<>();
 
     public ConfigGUI(MeteorPlugin plugin) {
         this.plugin = plugin;
@@ -114,6 +117,7 @@ public final class ConfigGUI implements Listener {
         s.locale = config.getConfig().getString("locale", "auto");
         s.configOverrides = config.getConfig().getBoolean("locale-config-overrides", false);
         s.nbtEnabled = config.getConfig().getBoolean("integrations.nbt-api.enabled", true);
+        s.hologramText = "";
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -151,9 +155,11 @@ public final class ConfigGUI implements Listener {
                 "&7Varsayılan şematik, geri yükleme, zaman aşımı"));
         s.inventory.setItem(17, item(Material.COMMAND_BLOCK, "&7Debug & Entegrasyon",
                 "&7Entegrasyon durumu, dil, NBT-API"));
+        s.inventory.setItem(19, item(Material.GLOW_ITEM_FRAME, "&bHologram & Görüntü",
+                "&7Hologram metinleri ve ekran ayarları"));
         // Dekoratif cam paneller (kalan boş slotlar)
         final ItemStack filler = item(Material.BLACK_STAINED_GLASS_PANE, "&8•");
-        for (final int slot : new int[]{18, 19, 21}) {
+        for (final int slot : new int[]{18, 21}) {
             s.inventory.setItem(slot, filler);
         }
     }
@@ -380,6 +386,8 @@ public final class ConfigGUI implements Listener {
             case PAGE_MOBS_EDIT -> handleMobsEditClick(s, slot, event);
             case PAGE_SCHEMATIC -> handleSchematicClick(s, slot, event);
             case PAGE_DEBUG -> handleDebugClick(s, slot, event);
+            case PAGE_HOLOGRAM_MENU -> handleHologramMenuClick(s, slot, event);
+            case PAGE_HOLOGRAM_EDIT -> handleHologramEditClick(s, slot, event);
         }
     }
 
@@ -398,6 +406,7 @@ public final class ConfigGUI implements Listener {
         else if (slot == 23) drawRewardsMenuPage(s);
         else if (slot == 17) drawDebugPage(s);
         else if (slot == 24) drawSchematicPage(s);
+        else if (slot == 19) drawHologramMenuPage(s);
     }
 
     private void handleLocationClick(Session s, int slot, InventoryClickEvent event) {
@@ -1007,6 +1016,155 @@ public final class ConfigGUI implements Listener {
 
     private static final String[] LOCALES = {"auto", "en", "tr"};
 
+    // ────────────────────────────────────────────────────────────────
+    //  HOLOGRAM & DISPLAY PAGE
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawHologramMenuPage(Session s) {
+        s.page = PAGE_HOLOGRAM_MENU;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        int slot = 10;
+        for (MeteorType type : MeteorType.values()) {
+            if (slot >= 35) break;
+            final String text = config.getHologramText(type);
+            final int offsetCount = config.getHologramOffsets(type).size();
+            s.inventory.setItem(slot++, item(Material.GLOW_ITEM_FRAME,
+                    config.getMeteorTypeColor(type) + config.getMeteorTypeName(type),
+                    "&7Metin: &f" + text,
+                    "&7Hologram offset: &f" + offsetCount + " adet",
+                    "&7&lTıkla düzenle"));
+        }
+    }
+
+    private void drawHologramEditPage(Session s) {
+        s.page = PAGE_HOLOGRAM_EDIT;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Hologram Menüsü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        final MeteorType type = s.editingType;
+        if (type == null) return;
+        final String text = s.hologramEdited ? s.hologramText : config.getHologramText(type);
+        final int offsetCount = config.getHologramOffsets(type).size();
+        // Hologram text (sohbet ile düzenleme)
+        s.inventory.setItem(10, item(Material.PAPER,
+                "&bHologram Metni",
+                "&7Mevcut: &f" + text,
+                "&7&lTıkla düzenle (sohbet)"));
+        // Hologram offset sayısı (salt okunur)
+        s.inventory.setItem(11, item(Material.ENDER_PEARL,
+                "&5Hologram Offsetleri: &f" + offsetCount + " adet",
+                "&7Kurulumdan gelen hologram konumları",
+                "&7Düzenlemek için oyun içi kurulumu kullan"));
+        // Restore-structure toggle
+        s.inventory.setItem(13, item(s.editRestoreStructure ? Material.LIME_DYE : Material.GRAY_DYE,
+                "&eYapı Geri Yükleme: " + bool(s.editRestoreStructure),
+                "&7Event sonunda snapshot geri yüklesin",
+                "&7Tıkla aç/kapat"));
+        // Schematic override
+        final String schemOverride = s.editSchematicOverride.isEmpty()
+                ? "&7Varsayılan" : "&f" + s.editSchematicOverride;
+        s.inventory.setItem(14, item(Material.FILLED_MAP,
+                "&8Şematik Geçersiz Kılma: " + schemOverride,
+                "&7Bu tür için özelleştirilmiş şematik",
+                "&7Sol/sağ tıkla değiştir"));
+    }
+
+    private void handleHologramMenuClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        final int typeIndex = slot - 10;
+        final MeteorType[] types = MeteorType.values();
+        if (typeIndex >= 0 && typeIndex < types.length) {
+            s.editingType = types[typeIndex];
+            s.hologramEdited = false;
+            s.hologramText = config.getHologramText(s.editingType);
+            s.editRestoreStructure = config.isStructureRestoreEnabled(s.editingType);
+            s.editSchematicOverride = config.getSchematicForType(s.editingType);
+            drawHologramEditPage(s);
+        }
+    }
+
+    private void handleHologramEditClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawHologramMenuPage(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        if (slot == 10) {
+            // Chat-based hologram text editing
+            final Player player = (Player) event.getWhoClicked();
+            final HologramChatContext ctx = new HologramChatContext(s, s.editingType);
+            hologramChatContexts.put(player.getUniqueId(), ctx);
+            player.closeInventory();
+            MessageUtil.sendMessage(player, "");
+            MessageUtil.sendMessage(player, "&6&l✦ Hologram metni düzenle");
+            MessageUtil.sendMessage(player, "&7Yeni metni yaz: &f(&7renk kodları için & kullan&f)");
+            MessageUtil.sendMessage(player, "&7Mevcut: &f" + s.hologramText);
+            MessageUtil.sendMessage(player, "&7İptal: &fdone");
+            MessageUtil.sendMessage(player, "");
+            return;
+        }
+        if (slot == 13) s.editRestoreStructure = !s.editRestoreStructure;
+        else if (slot == 14) cycleSchematicOverride(s, event.isRightClick() ? -1 : 1);
+        drawHologramEditPage(s);
+    }
+
+    private void cycleSchematicOverride(Session s, int delta) {
+        // Cycle through schematics: empty (default), then available schematics
+        final List<String> known = plugin.getSchematicManager().listSchematics();
+        final String current = s.editSchematicOverride.isEmpty() ? "" : s.editSchematicOverride;
+        int idx = known.indexOf(current);
+        if (idx < 0 && !current.isEmpty()) idx = known.size(); // not found, append
+        final int next = Math.floorMod(idx + delta, known.size() + 1);
+        s.editSchematicOverride = next == 0 ? "" : known.get(next - 1);
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  HOLOGRAM CHAT EDIT
+    // ────────────────────────────────────────────────────────────────
+
+    private record HologramChatContext(@NotNull Session session, @NotNull MeteorType type) {}
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onHologramChat(AsyncPlayerChatEvent event) {
+        final Player player = event.getPlayer();
+        final HologramChatContext ctx = hologramChatContexts.get(player.getUniqueId());
+        if (ctx == null) return;
+        event.setCancelled(true);
+        final String input = event.getMessage().trim();
+        plugin.getFoliaScheduler().callGlobal(() ->
+                processHologramChatInput(player, ctx, input));
+    }
+
+    private void processHologramChatInput(Player player, HologramChatContext ctx, String input) {
+        try {
+            hologramChatContexts.remove(player.getUniqueId());
+            if (input.equalsIgnoreCase("done") || input.equalsIgnoreCase("cancel")
+                    || input.equalsIgnoreCase("exit") || input.equals("0")) {
+                reopenHologramEditor(player, ctx);
+                return;
+            }
+            ctx.session.hologramText = input;
+            ctx.session.hologramEdited = true;
+            MessageUtil.sendMessage(player, "&aHologram metni güncellendi: &f" + input);
+            reopenHologramEditor(player, ctx);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Hologram chat input error: " + e.getMessage());
+            hologramChatContexts.remove(player.getUniqueId());
+        }
+    }
+
+    private void reopenHologramEditor(Player player, HologramChatContext ctx) {
+        final Session s = ctx.session;
+        s.editingType = ctx.type;
+        s.inventory = Bukkit.createInventory(null, 54,
+                MessageUtil.parse("&6&lOlMeteor &8• &eConfig Ayarları"));
+        sessions.put(player.getUniqueId(), s);
+        drawHologramEditPage(s);
+        player.openInventory(s.inventory);
+    }
+
     private void cycleLocale(Session s, int delta) {
         int idx = 0;
         for (int i = 0; i < LOCALES.length; i++) {
@@ -1185,6 +1343,13 @@ public final class ConfigGUI implements Listener {
             fileConfig.set("locale", s.locale);
             fileConfig.set("locale-config-overrides", s.configOverrides);
             fileConfig.set("integrations.nbt-api.enabled", s.nbtEnabled);
+        }
+        // Hologram & Display
+        if (s.hologramEdited && s.editingType != null) {
+            final String base = "meteor-types." + s.editingType.name().toLowerCase(Locale.ROOT) + ".";
+            fileConfig.set(base + "hologram-text", s.hologramText);
+            fileConfig.set(base + "restore-structure-on-finish", s.editRestoreStructure);
+            fileConfig.set(base + "schematic", s.editSchematicOverride);
         }
         // Save to disk
         try {
@@ -1425,5 +1590,10 @@ public final class ConfigGUI implements Listener {
         // Debug & Integration
         String locale;
         boolean nbtEnabled, configOverrides;
+        // Hologram & Display
+        boolean hologramEdited;
+        String hologramText;
+        boolean editRestoreStructure;
+        String editSchematicOverride;
     }
 }
