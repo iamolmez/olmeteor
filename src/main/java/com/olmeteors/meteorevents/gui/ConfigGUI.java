@@ -145,6 +145,11 @@ public final class ConfigGUI implements Listener {
                 "&7Ödül komutları ve sıralama ödülleri"));
         s.inventory.setItem(24, item(Material.FILLED_MAP, "&8Şematik & Geri Yükleme",
                 "&7Varsayılan şematik, geri yükleme, zaman aşımı"));
+        // Dekoratif cam paneller (boş slotları doldur)
+        final ItemStack filler = item(Material.BLACK_STAINED_GLASS_PANE, "&8•");
+        for (final int slot : new int[]{17, 18, 19, 21}) {
+            s.inventory.setItem(slot, filler);
+        }
     }
 
     // ────────────────────────────────────────────────────────────────
