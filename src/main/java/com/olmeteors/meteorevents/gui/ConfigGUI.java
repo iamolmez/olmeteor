@@ -93,6 +93,8 @@ public final class ConfigGUI implements Listener {
         s.cooldownEnabled = config.isLocationCooldownEnabled();
         s.cooldownRadius = config.getLocationCooldownRadius();
         s.cooldownHours = config.getLocationCooldownHours();
+        s.lootBlock = Material.matchMaterial(
+                config.getConfig().getString("event.vault.loot-block", "ANCIENT_DEBRIS"));
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -260,7 +262,8 @@ public final class ConfigGUI implements Listener {
         s.inventory.setItem(20, item(s.cooldownEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
                 "&eKonum Soğuması: " + bool(s.cooldownEnabled), "&7Tıkla aç/kapat"));
         s.inventory.setItem(21, item(Material.MAP, "&eSoğuma Yarıçapı: &f" + s.cooldownRadius,
-                "&7Sol/sağ: ±100 &7Shift: ±500"));                s.inventory.setItem(22, item(Material.CLOCK, "&eSoğuma Süresi: &f" + s.cooldownHours + " saat",
+                "&7Sol/sağ: ±100 &7Shift: ±500"));
+        s.inventory.setItem(22, item(Material.CLOCK, "&eSoğuma Süresi: &f" + s.cooldownHours + " saat",
                 "&7Sol/sağ: ±6"));
     }
 
@@ -599,7 +602,7 @@ public final class ConfigGUI implements Listener {
         if (s.editingType == null) return;
         final MeteorType type = s.editingType;
         final String base = "meteor-types." + type.name().toLowerCase(Locale.ROOT) + ".";
-        final var fileConfig = plugin.getConfig();
+        final var fileConfig = config.getConfig();
         fileConfig.set(base + "impact-radius", s.editRadius);
         fileConfig.set(base + "radius-shape", s.editShape.name());
         fileConfig.set(base + "boss-health-multiplier", s.editBossMult);
@@ -650,40 +653,31 @@ public final class ConfigGUI implements Listener {
         Inventory inventory;
         int page = PAGE_MAIN;
         // Location
-        String locationPreset = "flat_surface";
-        int minDistance = 100, maxDistance = 5000, terrainVariance = 5, bufferZone = 50;
-        boolean wgCheck = true, townyCheck = true;
+        String locationPreset;
+        int minDistance, maxDistance, terrainVariance, bufferZone;
+        boolean wgCheck, townyCheck;
         // Hazards
-        int radiation = 2, windInterval = 100;
-        double windKnockback = 1.5;
-        boolean disableElytra = true, disablePearl = true;
+        int radiation, windInterval;
+        double windKnockback;
+        boolean disableElytra, disablePearl;
         // Waves
-        int waveCount = 3, waveInterval = 15;
+        int waveCount, waveInterval;
         // Combat
-        boolean damageBar = true, killBar = true, leaderboard = true;
-        int leaderboardSize = 5, rewardTopCount = 3;
+        boolean damageBar, killBar, leaderboard;
+        int leaderboardSize, rewardTopCount;
         // Fall & Vault
-        int fallNormal = 80, fallSlow = 120, bossThreshold = 10, vaultDelay = 100;
-        boolean impactCore = false;
-        Material lootBlock = Material.ANCIENT_DEBRIS;
+        int fallNormal, fallSlow, bossThreshold, vaultDelay;
+        boolean impactCore;
+        Material lootBlock;
         // Auto
-        boolean autoEnabled = true, tpsGuard = true, cooldownEnabled = true;
-        int autoMin = 30, autoMax = 60, cooldownRadius = 1000, cooldownHours = 24;
-        double minTps = 18.0;
+        boolean autoEnabled, tpsGuard, cooldownEnabled;
+        int autoMin, autoMax, cooldownRadius, cooldownHours;
+        double minTps;
         // Type edit
         MeteorType editingType;
         int editRadius, editPreImpact, editDuration, editRollback, editNormalFall, editSlowFall;
         double editBossMult;
-        RadiusShape editShape = RadiusShape.CIRCLE;
-        MeteorFallMode editFallMode = MeteorFallMode.NORMAL;
-    }
-
-    // ────────────────────────────────────────────────────────────────
-    //  INIT LOADER
-    // ────────────────────────────────────────────────────────────────
-
-    public void loadFromConfig(@NotNull Player player) {
-        final Session s = sessions.get(player.getUniqueId());
-        if (s != null) loadConfigToSession(s);
+        RadiusShape editShape;
+        MeteorFallMode editFallMode;
     }
 }
