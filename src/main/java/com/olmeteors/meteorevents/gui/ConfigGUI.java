@@ -36,6 +36,8 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_TYPE_EDIT = 7;
     private static final int PAGE_LOOT_MENU = 8;
     private static final int PAGE_LOOT_EDIT = 9;
+    private static final int PAGE_REWARDS_MENU = 10;
+    private static final int PAGE_REWARDS_EDIT = 11;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -121,6 +123,8 @@ public final class ConfigGUI implements Listener {
                 "&7Her tür için yarıçap, boss, süre"));
         s.inventory.setItem(22, item(Material.CHEST, "&6Loot Ayarları",
                 "&7Her tür için loot bloğu, erişim modu, kişisel/ortak"));
+        s.inventory.setItem(23, item(Material.BOOK, "&6Ödül Ayarları",
+                "&7Ödül komutları ve sıralama ödülleri"));
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -338,6 +342,8 @@ public final class ConfigGUI implements Listener {
             case PAGE_TYPE_EDIT -> handleTypeEditClick(s, slot, event);
             case PAGE_LOOT_MENU -> handleLootMenuClick(s, slot, event);
             case PAGE_LOOT_EDIT -> handleLootEditClick(s, slot, event);
+            case PAGE_REWARDS_MENU -> handleRewardsMenuClick(s, slot, event);
+            case PAGE_REWARDS_EDIT -> handleRewardsEditClick(s, slot, event);
         }
     }
 
@@ -351,6 +357,7 @@ public final class ConfigGUI implements Listener {
         else if (slot == 15) drawAutoPage(s);
         else if (slot == 16) drawTypesMenu(s);
         else if (slot == 22) drawLootMenuPage(s);
+        else if (slot == 23) drawRewardsMenuPage(s);
     }
 
     private void handleLocationClick(Session s, int slot, InventoryClickEvent event) {
@@ -554,6 +561,82 @@ public final class ConfigGUI implements Listener {
         int idx = 0;
         for (int i = 0; i < modes.length; i++) if (modes[i].equals(s.editAccessMode)) idx = i;
         s.editAccessMode = modes[Math.floorMod(idx + delta, modes.length)];
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  REWARDS PAGES
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawRewardsMenuPage(Session s) {
+        s.page = PAGE_REWARDS_MENU;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        int slot = 10;
+        for (MeteorType type : MeteorType.values()) {
+            if (slot >= 35) break;
+            s.inventory.setItem(slot++, item(Material.BOOK,
+                    config.getMeteorTypeColor(type) + config.getMeteorTypeName(type),
+                    "&7Ödül komutlarını ve sıralama ödüllerini düzenle",
+                    "&7&lTıkla düzenle"));
+        }
+    }
+
+    private void drawRewardsEditPage(Session s) {
+        s.page = PAGE_REWARDS_EDIT;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ödül Menüsü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        final MeteorType type = s.editingType;
+        if (type == null) return;
+        final var tc = config.getTypeConfig(type);
+        s.inventory.setItem(10, item(Material.BOOK, "&eGenel Ödül Komutları",
+                "&7Bu meteor türü için kasa açılış komutları",
+                "&7&lSayı: &f" + tc.rewardsCommands().size()));
+        s.inventory.setItem(11, item(Material.CHEST, "&eGenel Ödül Eşyaları",
+                "&7Bu meteor türü için kasa açılış eşyaları",
+                "&7&lSayı: &f" + config.getRankingRewardItems(type, 0).size()));
+        s.inventory.setItem(14, item(Material.EMERALD, "&6Sıralama Ödülleri &7(#" + s.editRank + ")",
+                "&7Sol/sağ: sırayı değiştir",
+                "&7Düzenlemek için tıkla"));
+        // Show rank-specific info
+        final List<String> rankItems = config.getRankingRewardItems(type, s.editRank);
+        final List<String> rankCmds = config.getRankingRewardCommands(type, s.editRank);
+        s.inventory.setItem(15, item(Material.DIAMOND,
+                "&bSıra #" + s.editRank + " &7- Eşyalar",
+                rankItems.isEmpty()
+                        ? new String[]{"&7Henüz eşya eklenmemiş"}
+                        : rankItems.stream().limit(5).map(i -> "&7- " + i).toArray(String[]::new)));
+        s.inventory.setItem(16, item(Material.PAPER,
+                "&bSıra #" + s.editRank + " &7- Komutlar",
+                rankCmds.isEmpty()
+                        ? new String[]{"&7Henüz komut eklenmemiş"}
+                        : rankCmds.stream().limit(5).map(c -> "&7- " + c).toArray(String[]::new)));
+    }
+
+    private void handleRewardsMenuClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        final int typeIndex = slot - 10;
+        final MeteorType[] types = MeteorType.values();
+        if (typeIndex >= 0 && typeIndex < types.length) {
+            s.editingType = types[typeIndex];
+            s.editRank = 0;
+            drawRewardsEditPage(s);
+        }
+    }
+
+    private void handleRewardsEditClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawRewardsMenuPage(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        final boolean right = event.isRightClick();
+        if (slot == 14) {
+            // 0=genel ödüller, 1-3=sıralama ödülleri
+            s.editRank = Math.floorMod(s.editRank + (right ? -1 : 1), 4);
+            drawRewardsEditPage(s);
+        }
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -785,5 +868,7 @@ public final class ConfigGUI implements Listener {
         Material editLootBlock;
         String editAccessMode;
         boolean editPersonalLoot;
+        // Rewards edit
+        int editRank;
     }
 }
