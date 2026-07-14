@@ -44,6 +44,7 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_MOBS_MENU = 13;
     private static final int PAGE_MOBS_EDIT = 14;
     private static final int PAGE_SCHEMATIC = 15;
+    private static final int PAGE_DEBUG = 16;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -110,6 +111,9 @@ public final class ConfigGUI implements Listener {
         s.cleanupDelay = config.getCompletionCleanupDelaySeconds();
         s.unattendedTimeout = config.getUnattendedTimeoutMinutes();
         s.chunkRadius = config.getChunkForceLoadRadius();
+        s.locale = config.getConfig().getString("locale", "auto");
+        s.configOverrides = config.getConfig().getBoolean("locale-config-overrides", false);
+        s.nbtEnabled = config.getConfig().getBoolean("integrations.nbt-api.enabled", true);
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -145,9 +149,11 @@ public final class ConfigGUI implements Listener {
                 "&7Ödül komutları ve sıralama ödülleri"));
         s.inventory.setItem(24, item(Material.FILLED_MAP, "&8Şematik & Geri Yükleme",
                 "&7Varsayılan şematik, geri yükleme, zaman aşımı"));
-        // Dekoratif cam paneller (boş slotları doldur)
+        s.inventory.setItem(17, item(Material.COMMAND_BLOCK, "&7Debug & Entegrasyon",
+                "&7Entegrasyon durumu, dil, NBT-API"));
+        // Dekoratif cam paneller (kalan boş slotlar)
         final ItemStack filler = item(Material.BLACK_STAINED_GLASS_PANE, "&8•");
-        for (final int slot : new int[]{17, 18, 19, 21}) {
+        for (final int slot : new int[]{18, 19, 21}) {
             s.inventory.setItem(slot, filler);
         }
     }
@@ -373,6 +379,7 @@ public final class ConfigGUI implements Listener {
             case PAGE_MOBS_MENU -> handleMobsMenuClick(s, slot, event);
             case PAGE_MOBS_EDIT -> handleMobsEditClick(s, slot, event);
             case PAGE_SCHEMATIC -> handleSchematicClick(s, slot, event);
+            case PAGE_DEBUG -> handleDebugClick(s, slot, event);
         }
     }
 
@@ -389,6 +396,7 @@ public final class ConfigGUI implements Listener {
         else if (slot == 20) drawMobsMenuPage(s);
         else if (slot == 22) drawLootMenuPage(s);
         else if (slot == 23) drawRewardsMenuPage(s);
+        else if (slot == 17) drawDebugPage(s);
         else if (slot == 24) drawSchematicPage(s);
     }
 
@@ -946,6 +954,67 @@ public final class ConfigGUI implements Listener {
         drawSchematicPage(s);
     }
 
+    // ────────────────────────────────────────────────────────────────
+    //  DEBUG & INTEGRATION PAGE
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawDebugPage(Session s) {
+        s.page = PAGE_DEBUG;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet"));
+        // Integration statuses (read-only)
+        final String fawe = plugin.getFAWEHook().isAvailable() ? "&a✔" : "&c✘";
+        final String wg = plugin.getWGHook().isAvailable() ? "&a✔" : "&c✘";
+        final String towny = plugin.getTownyHook().isAvailable() ? "&a✔" : "&c✘";
+        final String mm = plugin.getMythicMobsHook().isAvailable() ? "&a✔" : "&c✘";
+        final String papi = plugin.getPlaceholderAPIHook().isAvailable() ? "&a✔" : "&c✘";
+        final String folia = MeteorPlugin.isFolia() ? "&aEvet" : "&cHayır";
+        s.inventory.setItem(10, item(Material.BOOK, "&7Aktif Entegrasyonlar",
+                "&eFAWE: " + fawe, "&eWorldGuard: " + wg, "&eTowny: " + towny,
+                "&eMythicMobs: " + mm, "&ePlaceholderAPI: " + papi,
+                "&8Folia: " + folia));
+        // NBT-API toggle
+        s.inventory.setItem(12, item(s.nbtEnabled ? Material.LIME_DYE : Material.GRAY_DYE,
+                "&eNBT-API Entegrasyonu: " + bool(s.nbtEnabled),
+                "&7Özel eşya verilerini korur", "&7Tıkla aç/kapat"));
+        // Locale
+        s.inventory.setItem(13, item(Material.PAPER,
+                "&6Dil: &f" + s.locale,
+                "&7auto = otomatik algılama", "&7en = İngilizce", "&7tr = Türkçe",
+                "&7Sol/sağ tıkla değiştir"));
+        // Config overrides
+        s.inventory.setItem(14, item(s.configOverrides ? Material.LIME_DYE : Material.GRAY_DYE,
+                "&eConfig Geçersiz Kılma: " + bool(s.configOverrides),
+                "&7Açıksa config.yml mesajları dil dosyasını ezer",
+                "&7Tıkla aç/kapat"));
+        // Version info
+        final String version = plugin.getPluginMeta().getVersion();
+        s.inventory.setItem(15, item(Material.KNOWLEDGE_BOOK, "&8Sürüm: &f" + version,
+                "&8Paper 1.21.1+", "&8Folia: " + folia));
+    }
+
+    private void handleDebugClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); drawMainMenu(s); return; }
+        final boolean right = event.isRightClick();
+        if (slot == 12) s.nbtEnabled = !s.nbtEnabled;
+        else if (slot == 13) cycleLocale(s, right ? -1 : 1);
+        else if (slot == 14) s.configOverrides = !s.configOverrides;
+        drawDebugPage(s);
+    }
+
+    private static final String[] LOCALES = {"auto", "en", "tr"};
+
+    private void cycleLocale(Session s, int delta) {
+        int idx = 0;
+        for (int i = 0; i < LOCALES.length; i++) {
+            if (LOCALES[i].equals(s.locale)) { idx = i; break; }
+        }
+        s.locale = LOCALES[Math.floorMod(idx + delta, LOCALES.length)];
+    }
+
     private void changeTicketMaterial(Session s, ItemStack cursor, int delta) {
         if (cursor != null && !cursor.isEmpty() && cursor.getType().isItem()) {
             s.ticketMaterial = cursor.getType().name();
@@ -1111,6 +1180,12 @@ public final class ConfigGUI implements Listener {
         fileConfig.set("event.completion.cleanup-delay-seconds", s.cleanupDelay);
         fileConfig.set("event.completion.unattended-timeout-minutes", s.unattendedTimeout);
         fileConfig.set("event.chunk-force-load-radius", s.chunkRadius);
+        // Debug & Integration
+        if (s.locale != null) {
+            fileConfig.set("locale", s.locale);
+            fileConfig.set("locale-config-overrides", s.configOverrides);
+            fileConfig.set("integrations.nbt-api.enabled", s.nbtEnabled);
+        }
         // Save to disk
         try {
             fileConfig.save(new java.io.File(plugin.getDataFolder(), "config.yml"));
@@ -1347,5 +1422,8 @@ public final class ConfigGUI implements Listener {
         // Schematic & Recovery
         boolean recoveryEnabled;
         int cleanupDelay, unattendedTimeout, chunkRadius;
+        // Debug & Integration
+        String locale;
+        boolean nbtEnabled, configOverrides;
     }
 }
