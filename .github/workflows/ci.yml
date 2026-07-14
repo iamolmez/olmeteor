@@ -60,8 +60,8 @@ jobs:
           WIKI_TOKEN: ${{ secrets.PAT_PAGES }}
         if: env.WIKI_TOKEN != ''
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git clone https://${{ github.actor }}:${{ secrets.PAT_PAGES }}@github.com/${{ github.repository }}.wiki.git .wiki-tmp
 
           # Mevcut wiki dosyalarını temizle (Home.md ve _Sidebar.md hariç)
