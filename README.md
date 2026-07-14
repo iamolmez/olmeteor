@@ -2,7 +2,7 @@
 
 Paper ve Folia sunuculari icin tamamen ozellestirilebilir meteor etkinligi eklentisi.
 
-**Version:** 1.3.0 | **Java:** 21 | **Paper/Folia:** 1.21.1+
+**Version:** 1.4.0 | **Java:** 21 | **Paper/Folia:** 1.21.1+
 
 ---
 
@@ -36,7 +36,7 @@ Paper ve Folia sunuculari icin tamamen ozellestirilebilir meteor etkinligi eklen
 
 ```
 1. Sunucuyu tamamen kapatin
-2. OlMeteor-1.3.0.jar ve CommandAPI JAR'ini plugins/ klasorune koyun
+2. OlMeteor-1.4.0.jar ve CommandAPI JAR'ini plugins/ klasorune koyun
 3. Istege bagli entegrasyonlari yukleyin
 4. Sunucuyu baslatin
 5. /olmeteor debug ile entegrasyonlari kontrol edin
@@ -57,11 +57,11 @@ Paper ve Folia sunuculari icin tamamen ozellestirilebilir meteor etkinligi eklen
 
 ## Dokumantasyon
 
-Tum wiki sayfalari icin [wiki/Index.md](wiki/Index.md) sayfasina gidin.
+Tum wiki sayfalari icin [Wiki sayfasina](https://github.com/iamolmez/olmeteor/wiki/Index) gidin.
 
 **Dogrudan baslangic:**
-- [Turkce Ana Sayfa](wiki/Home.md)
-- [English Home](wiki/en/Home.md)
+- [Turkce Ana Sayfa](https://github.com/iamolmez/olmeteor/wiki/Home)
+- [English Home](https://github.com/iamolmez/olmeteor/wiki/en/Home)
 
 ---
 
@@ -101,7 +101,7 @@ Proje Gradle ile yonetilmektedir:
 ./gradlew build
 ```
 
-Cikti: `build/libs/OlMeteor-1.3.0.jar`
+Cikti: `build/libs/OlMeteor-1.4.0.jar`
 
 ---
 
