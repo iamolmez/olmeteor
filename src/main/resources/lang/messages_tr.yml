@@ -1,0 +1,368 @@
+# ═══════════════════════════════════════════════════════════════
+#  OlMeteor - Türkçe Dil Dosyası
+#  Turkish Locale
+#  This file ships with the plugin and is copied to
+#  <data-folder>/lang/messages_tr.yml on first run.
+# ═══════════════════════════════════════════════════════════════
+
+messages:
+  # ── Komut mesajları ──
+  command:
+    help:
+      title: "&6&l=== OlMeteor Yardım ==="
+      usage: |
+        &e/olmeteor help &7- Bu yardım mesajını göster
+        &e/olmeteor setup <tip> &7- Görsel kurulum moduna gir
+        &e/olmeteor schematic <isim> &7- Setup seçimini şematik olarak kaydet
+        &e/olmeteor start <tip> [dünya] [yarıçap] &7- Meteor etkinliği başlat
+        &e/olmeteor spawnat <tip> <xyz> [dünya] &7- Koordinatlarda başlat
+        &e/olmeteor stop <id> &7- Etkinliği durdur ve geri al
+        &e/olmeteor cancel <id> &7- Etkinliği iptal et
+        &e/olmeteor reload &7- Yapılandırmayı yenile
+        &e/olmeteor wand &7- Kurulum asasını al
+        &e/olmeteor list &7- Aktif etkinlikleri listele
+        &e/olmeteor info <id> [hedef] &7- Etkinlik detaylarını göster
+    reload:
+      success: "&aYapılandırma başarıyla yenilendi."
+    wand:
+      success: "&aKurulum asası envanterinize eklendi."
+    player_only: "&cBu komut yalnızca bir oyuncu tarafından kullanılabilir."
+    no_permission: "&cBu komutu kullanma yetkiniz yok."
+
+    setup:
+      usage: "&eKullanım: /olmeteor setup <tip>"
+      available_types: "&7Kullanılabilir tipler: %types%"
+      invalid_type: "&cGeçersiz meteor tipi: &e%type%"
+
+    start:
+      usage: "&eKullanım: /olmeteor start <tip> [dünya]"
+      invalid_type: "&cGeçersiz meteor tipi: &e%type%"
+      scheduled: "&aMeteor etkinliği &e%eventId% &aşu konumda planlandı: &e%location%"
+      error: "&cEtkinlik başlatılırken bir hata oluştu: %error%"
+      location_fail: "&cMeteor etkinliği için uygun bir konum bulunamadı. Farklı bir dünya veya tip deneyin."
+      world_not_found: "&c'%world%' dünyası bulunamadı."
+
+    stop:
+      usage: "&eKullanım: /olmeteor stop <eventId>"
+      no_event: "&c%eventId% ID'li aktif etkinlik bulunamadı."
+      success: "&a&e%eventId% &aetkinliği durduruluyor. Geri alma işlemi başladı."
+
+    cancel:
+      usage: "&eKullanım: /olmeteor cancel <eventId>"
+      no_event: "&c%eventId% ID'li aktif etkinlik bulunamadı."
+      success: "&c&e%eventId% &cetkinliği iptal edildi."
+
+    list:
+      title: "&6&l=== Aktif Meteor Etkinlikleri ==="
+      empty: "&eHiçbir aktif meteor etkinliği bulunmuyor."
+      entry: "&7- &f%eventId% &7| Tip: &f%type% &7| Dünya: &f%world% &7| %location%"
+
+    info:
+      title: "&6&l=== Meteor Etkinlik Bilgisi ==="
+      no_event: "&c%eventId% ID'li aktif etkinlik bulunamadı."
+      id: "&7ID: &f%eventId%"
+      type: "&7Tip: &f%type%"
+      phase: "&7Safha: &f%phase%"
+      world: "&7Dünya: &f%world%"
+      location: "&7Konum: &f%location%"
+      radius: "&7Yarıçap: &f%radius% blok"
+      schematic: "&7Şematik: &f%schematic%"
+      distance: "&7&e%player%&7 mesafesi: &f%distance% blok"
+
+    spawnat:
+      usage: "&eKullanım: /olmeteor spawnat <tip> <x> <y> <z> [dünya]"
+
+  # ── Görüntü varlık mesajları (hologramlar, yüzen metin) ──
+  display:
+    vault_hologram: "&6&l✦ Kasa &7| &eAnahtar: &f%count%"
+
+  # ── Özel eşya isimleri ve açıklamaları ──
+  item:
+    meteor_key:
+      name: "&6&l✦ Meteor Anahtarı"
+      lore: |
+        &7Göktaşı parçalarından dövülmüş bir anahtar.
+        &7Meteor Kasasını açmak için kullanılır.
+        
+        &6✦ Meteor Tipi: &e%meteor_type%
+        &7✦ &8Tek kullanımlık
+        &7✦ &8Kişisel ganimet
+        
+        &e&lMeteor Kasasına sağ tıklayarak açın!
+    setup_wand:
+      name: "&6&l✦ Kurulum Asası"
+      lore: |
+        &6&l=== Bölge Seçim Aracı ===
+        &eSol Tık &7- 1. konumu işaretle
+        &eSağ Tık &7- 2. konumu işaretle
+        
+        &7Meteorun çarpacağı
+        &7bölgeyi seçin.
+    mob_spawn_tool:
+      name: "&6&l✦ Doğma Noktası İşaretleyici"
+      lore: |
+        &6&l=== Mob Doğma Noktası Aracı ===
+        &eSağ Tık &7- Doğma noktası belirle
+        
+        &7MythicMobs veya normal
+        &7mobların doğacağı yerleri işaretleyin.
+    loot_editor_item:
+      name: "&6&l✦ Ganimet Düzenleyici"
+      lore: |
+        &6&l=== Ganimet Düzenleyici ===
+        &eYere koy &7- Ganimet GUI'sini aç
+        
+        &7Meteor etkinliği ödülleri için
+        &7ganimet tablosunu yapılandırın.
+        
+        &8GUI'deki eşyalara tıklayarak
+        &8düşme şansı ve miktar ayarlayın.
+    safe_exit:
+      name: "&a&l✦ Güvenli Çıkış"
+      lore: |
+        &6&l=== Güvenli Çıkış ===
+        &eSağ Tık &7- Kaydet ve kurulumdan çık
+        
+        &7Envanteriniz geri yüklenecek
+        &7ve tüm kurulum verileri kaydedilecek.
+        
+        &a&l✔ Güvenle çıkmak için tıklayın!
+    meteor_core:
+      name: "&6&l★ Meteor Çekirdeği"
+      lore: "&7Düşen bir yıldızın yanan kalbi."
+    wind_charge:
+      name: "&b&l✦ Kasırga Fırlatıcı"
+      lore: |
+        &7Yoğunlaştırılmış bir rüzgar patlaması,
+        &7düşmanları gökyüzüne fırlatabilir.
+    mace:
+      name: "&6&l✦ Meteorit Topuz"
+      lore: |
+        &7Düşen bir meteorun çekirdeğinden dövüldü,
+        &7bu topuz göksel enerjiyle çatırdıyor.
+        
+        &6Yoğunluk %density_level%
+        &6Yarılma %breach_level%
+        &6Rüzgar Patlaması %wind_burst_level%
+
+  # ── Etkinlik yayın mesajları ──
+  event:
+    broadcast:
+      incoming: "%color%&l⚠ %name% &egeliyor! &c%seconds% saniye\n&8➜ &b%world% &8• &7X: &f%x% &8• &7Y: &f%y% &8• &7Z: &f%z%"
+      impacting: "%color%&l💥 %name% &eÇARPTI!\n&8➜ &b%world% &8• &7X: &f%x% &8• &7Y: &f%y% &8• &7Z: &f%z%"
+      active: "%color%&l⚔ %name% &eaktif! Sandığı açmak için boss'u yenin!"
+      wave: "&6&l⚔ %name% &eDalga &f%wave%&7/&f%total% &ebaşladı!"
+      all_chests_opened: "&a&lTüm ödül sandıkları açıldı! &eMeteor alanı &c10 saniye &esonra silinecek."
+      rollback: "%color%&l🔄 %name% &ebölgesi geri yükleniyor..."
+      restored: "%color%&l✅ %name% &abölgesi başarıyla geri yüklendi!"
+      cancelled: "%color%&l%name% &cetkinliği iptal edildi!"
+
+  # ── Patron mesajları ──
+  boss:
+    custom_name: "&6&l✦ Meteor Patronu ✦"
+
+  # ── Tehlike mesajları ──
+  hazard:
+    radiation:
+      actionbar: "&c&l☢ RADYASYON &7| &e%health% &c❤"
+    wind:
+      actionbar: "&b&l🌪 RÜZGAR PATLAMASI! &7Geriye savruldunuz!"
+    emp:
+      elytra: "&c&l⚡ EMP ALANI &7| &eElytra sistemi devre dışı!"
+      elytra_block: "&c&l⚡ EMP ALANI &7| &eElytra burada kullanılamaz!"
+      pearl_block: "&c&l⚡ EMP ALANI &7| &eEnder İncileri bu bölgede yasak!"
+
+  # ── Kasa mesajları ──
+  vault:
+    locked: "&c&l✦ Kasa Kilitli! &7Önce meteor boss'u yenmelisiniz!"
+    key_required: "&c&l✦ Anahtar Gerekli! &7Bu kasayı açmak için bir Meteor Anahtarına ihtiyacınız var."
+    already_opened: "&c&l✦ Bu kasayı zaten açtınız!"
+    opened: "&6&l✦ Kasa Açıldı! &7Kişisel ganimetini aldın."
+    opened_shared: "&6&l✦ Ortak loot açıldı! &7Eşyalar bütün oyuncular için ortaktır."
+    mine_to_open: "&eÖdülü almak için bu bloğu kazman gerekiyor."
+    interact_to_open: "&eBu loot bloğu sağ tıklanarak açılır."
+    inactive: "&cÖdül bloğu henüz aktif değil."
+    mobs_alive: "&cLoot açılmadan önce bütün meteor mobları öldürülmeli."
+    top_only: "&cBu ödülü yalnızca hasar sıralamasındaki ilk &e%count% &coyuncu açabilir."
+    ranking_reward: "&aHasar sıralaması ödülün verildi! &eSıra: #%rank%"
+    key_received: "&6&l✦ Meteor Anahtarı Kazanıldı! &7Boss'a %damage%% &7hasar verdin."
+
+  # ── Kurulum modu mesajları ──
+  setup:
+    choice:
+      title: "&6%type% &7için nasıl kurulum yapmak istersiniz?"
+      create_new: "&a&l[SIFIRDAN OLUŞTUR]"
+      create_new_hover: "&7Dünyada iki köşe seçerek yeni schematic oluştur."
+      existing_title: "&eKayıtlı schematic seçmek için aşağıdakilerden birine tıklayın:"
+      existing_entry: "&b➤ &f%name%"
+      existing_hover: "&e%name% &7dosyasını bu meteor tipine ata."
+      no_schematics: "&eHenüz kayıtlı schematic yok. Sıfırdan oluştur seçeneğini kullanın."
+      not_found: "&c%name% adlı schematic bulunamadı."
+      assigned: "&a%name%, &e%type% &ameteor tipine atandı."
+    entered: |
+      &6&l✦ METEOR KURULUM MODU ✦
+      &7Yapılandırılan tip: &e%type%
+      &7Etkinliği yapılandırmak için hotbar'daki eşyaları kullanın.
+      &7Çıkmak için &e/olmeteor setup &7yazın veya &aGüvenli Çıkış&7 eşyasına tıklayın.
+    exited: "&aEnvanter geri yüklendi. Kurulum modundan çıkıldı."
+    exit_failed: "&eEnvanter yedekten geri yüklenemedi. Envanteriniz temizlendi."
+    backup_failed: "&cEnvanter yedeklenemedi. Kurulum modu iptal edildi."
+    pos1_set: "&a1. konum işaretlendi: &e%location%"
+    pos2_set: "&a2. konum işaretlendi: &e%location%"
+    region_selected: "&7Bölge seçildi: %size% blok"
+    schematic:
+      not_in_setup: "&cÖnce &e/olmeteor setup <tip> &cile kurulum moduna girmelisiniz."
+      select_region_first: "&cÖnce kurulum asasıyla iki köşe seçmelisiniz."
+      same_world_required: "&cİki seçim noktası aynı dünyada olmalıdır."
+      invalid_name: "&cGeçersiz isim. Yalnızca a-z, 0-9, alt çizgi ve kısa çizgi kullanın."
+      fawe_required: "&cŞematik kaydetmek için FAWE veya WorldEdit yüklü olmalıdır."
+      saving: "&e%name% &7şematiği kaydediliyor..."
+      saved: "&a%name% kaydedildi ve &e%type% &ameteor tipine atandı."
+      failed: "&c%name% şematiği kaydedilemedi. Konsolu kontrol edin."
+      config_failed: "&e%name% dosyası kaydedildi ancak config ayarı yazılamadı."
+    mob_spawn_added: "&aMob doğma noktası eklendi: &e%location%"
+    mob_spawn_total: "&7Toplam doğma noktası: &e%count%"
+    loot_editor_opened: "&7&e%type% &7için Loot Düzenleyici açıldı"
+    command_blocked: "&cBu komut kurulum modundayken devre dışıdır. Çıkmak için &e/olmeteor setup &7yazın."
+    command_not_allowed: "&cBu komuta kurulum modundayken izin verilmez."
+    tool_slot_filler: "&7✦ Kurulum Aracı Yuvası ✦"
+    # ── Kurulum aksiyon çubuğu (canlı durum göstergesi) ──
+    actionbar:
+      template: "&eSOL: %pos1_status% &7| &eSAĞ: %pos2_status% &7| &dMob Noktası: %mob_count% &7| &6Tip: &e%type%"
+      pos1_saved: "&aK1 kaydedildi"
+      pos1_pending: "&7K1 bekleniyor"
+      pos2_saved: "&aK2 kaydedildi"
+      pos2_pending: "&7K2 bekleniyor"
+
+  # ── Loot Düzenleyici mesajları ──
+  loot_editor:
+    opened: "&7&e%type% &7için Loot Düzenleyici açıldı"
+    drag_hint: "&7Öğeleri loot tablosuna eklemek için ızgaraya sürükleyin."
+    click_hint: "&7Şans ve miktar ayarlamak için ızgaradaki öğelere tıklayın."
+    cleared: "&aGanimet tablosu temizlendi."
+    reset: "&aGanimet tablosu bu meteor tipinin varsayılanlarına döndürüldü. Kaydetmek için yeşil tuşa basın."
+    discarded: "&eDeğişiklikler kaydedilmeden kapatıldı."
+    saved: "&a&e%type% &aiçin ganimet tablosu kaydedildi."
+    added: "&aEşya ganimet tablosuna eklendi."
+    removed: "&aEşya ganimet tablosundan kaldırıldı."
+    selected: "&7%slot%. slot seçildi. Düzenlemek için kontrol panelini kullanın."
+    select_first: "&eÖnce ızgarada bir eşyaya tıklayın."
+    item_locked: "&aEşya kilitlendi."
+    item_unlocked: "&aEşya kilidi açıldı."
+    cancelled: "&7Düzenleme iptal edildi. Düzenleyici yeniden açılıyor..."
+    no_longer_exists: "&cDüzenlediğiniz eşya artık ganimet tablosunda bulunmuyor."
+    chance_changed: "&7Düşme şansı güncellendi: &e%old%% &7→ &e%new%%"
+    amount_changed: "&7Miktar aralığı güncellendi: &e%old% &7→ &e%new%"
+    chance_prompt: |
+      
+      &6&l✦ Düşme Şansını Düzenle
+      &7Mevcut: &e%current%%
+      &7&e0.1&7 ile &e100.0&7 arasında bir değer girin:
+      &7İptal için &e0&7 yazın.
+      
+    amount_prompt: |
+      
+      &6&l✦ Miktar Aralığını Düzenle
+      &7Mevcut: &e%current%
+      &7Min ve max değerleri boşlukla ayırarak girin:
+      &7Örnek: &e1 5
+      &7İptal için &e0&7 yazın.
+      
+    chance_error: "&cGeçersiz şans değeri. Lütfen 0.1 ile 100.0 arasında bir sayı girin."
+    chance_retry: "&7Yeni şansı yazın veya &e0&7 ile iptal edin:"
+    amount_error: "&cGeçersiz miktar aralığı. Lütfen boşlukla ayrılmış iki sayı girin (ör: &e1 5&c)"
+    amount_retry: "&7Min ve max miktarı yazın veya &e0&7 ile iptal edin:"
+    unexpected_error: "&cBeklenmeyen bir hata oluştu. Lütfen tekrar deneyin."
+    # ── GUI görüntü metinleri ──
+    gui:
+      title_prefix: "&6&l✦ Meteor Ganimet Düzenleyici &8- &7"
+      item_separator: "&8&m----------------------"
+      locked_yes: "&aEvet"
+      locked_no: "&cHayır"
+      locked_status: "&7Kilitli: %status%"
+      drop_chance: "&7Düşme Şansı: &e%chance%%"
+      amount_range: "&7Miktar: &e%min% - &e%max%"
+      selected_status: "&a✔ Seçili eşya"
+      left_click: "&7Sol-tık: Şans düzenle"
+      right_click: "&7Sağ-tık: Miktar düzenle"
+      shift_click: "&7Shift+Tık: Kilit değiştir"
+      q_drop: "&7Q/At: Eşyayı kaldır"
+      info_name: "&6&lGanimet Tablosu Bilgisi"
+      info_type: "&7Tip: &e%type%"
+      info_items: "&7Eşya: &e%count%"
+      info_difficulty: "&7Zorluk: %color%%difficulty%"
+      chance_name: "&6Şans Düzenle"
+      chance_lore: |
+        &7Izgarada bir eşyaya tıklayın,
+        &7ardından düşme şansını
+        &7düzenlemek için buraya tıklayın (&e0.1% - 100%&7).
+      amount_name: "&6Miktar Düzenle"
+      amount_lore: |
+        &7Izgarada bir eşyaya tıklayın,
+        &7ardından minimum ve maksimum
+        &7miktarı düzenlemek için buraya tıklayın.
+      lock_name: "&6Kilit Değiştir"
+      lock_lore: |
+        &7Izgarada bir eşyaya tıklayın,
+        &7ardından özel anahtar gerekip
+        &7gerekmediğini değiştirmek için buraya tıklayın.
+      reset_name: "&e&lVarsayılana Döndür"
+      reset_lore: |
+        &7Bu meteor tipinin başlangıç
+        &7ganimetlerini tekrar yükler.
+      clear_name: "&c&lTümünü Temizle"
+      clear_lore: |
+        &7Tüm eşyaları ganimet
+        &7tablosundan kaldırır.
+      cancel_name: "&cKaydetmeden Kapat"
+      cancel_lore: |
+        &7Bu oturumdaki değişiklikleri
+        &7iptal eder ve menüyü kapatır.
+      save_name: "&a&l✔ Kaydet & Kapat"
+      save_lore: |
+        &7Geçerli ganimet tablosunu
+        &7kaydeder ve düzenleyiciyi kapatır.
+
+  # ── Mesaj Ön Ekleri ──
+  message_prefix:
+    chat: "&8[&6Ol&eMeteor&8] &r"
+    broadcast: "&8[&6Ol&eMeteor&8] &r"
+    warning: "&e&l⚠ &6Uyarı: &e"
+    error: "&4&l✘ &cHata: &4"
+    success: "&a&l✔ &2"
+    info: "&8[&bℹ&8] &7"
+
+  # ── Meteor Tipi İsimleri ve Renkleri ──
+  meteor_type:
+    small:
+      name: "Küçük Meteor"
+      color: "&a"
+    medium:
+      name: "Orta Meteor"
+      color: "&e"
+    large:
+      name: "Büyük Meteor"
+      color: "&c"
+    epic:
+      name: "Epik Meteor"
+      color: "&5"
+    legendary:
+      name: "Efsanevi Meteor"
+      color: "&6"
+    difficulty:
+      easy:
+        name: "Kolay"
+        color: "&a"
+      normal:
+        name: "Normal"
+        color: "&e"
+      hard:
+        name: "Zor"
+        color: "&c"
+      epic:
+        name: "Epik"
+        color: "&5"
+      legendary:
+        name: "Efsanevi"
+        color: "&6"
+

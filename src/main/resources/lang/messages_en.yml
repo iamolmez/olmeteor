@@ -1,0 +1,368 @@
+# ═══════════════════════════════════════════════════════════════
+#  OlMeteor - English Locale (Fallback)
+#  This file ships with the plugin and is copied to
+#  <data-folder>/lang/messages_en.yml on first run.
+#  Edits here will be overwritten on plugin update.
+# ═══════════════════════════════════════════════════════════════
+
+messages:
+  # ── Command messages ──
+  command:
+    help:
+      title: "&6&l=== OlMeteor Help ==="
+      usage: |
+        &e/olmeteor help &7- Display this help message
+        &e/olmeteor setup <type> &7- Enter visual setup mode
+        &e/olmeteor schematic <name> &7- Save the setup selection as a schematic
+        &e/olmeteor start <type> [world] [radius] &7- Start a meteor event
+        &e/olmeteor spawnat <type> <xyz> [world] &7- Start at coordinates
+        &e/olmeteor stop <id> &7- Stop and rollback an event
+        &e/olmeteor cancel <id> &7- Cancel an event immediately
+        &e/olmeteor reload &7- Reload configuration
+        &e/olmeteor wand &7- Receive the setup wand
+        &e/olmeteor list &7- List active events
+        &e/olmeteor info <id> [target] &7- Show event details
+    reload:
+      success: "&aConfiguration reloaded successfully."
+    wand:
+      success: "&aSetup wand has been added to your inventory."
+    player_only: "&cThis command can only be executed by a player."
+    no_permission: "&cYou do not have permission to use this command."
+
+    setup:
+      usage: "&eUsage: /olmeteor setup <type>"
+      available_types: "&7Available types: %types%"
+      invalid_type: "&cInvalid meteor type: &e%type%"
+
+    start:
+      usage: "&eUsage: /olmeteor start <type> [world]"
+      invalid_type: "&cInvalid meteor type: &e%type%"
+      scheduled: "&aMeteor event &e%eventId% &ascheduled at &e%location%"
+      error: "&cAn error occurred while starting the event: %error%"
+      location_fail: "&cCould not find a suitable location for the meteor event. Try a different world or type."
+      world_not_found: "&cWorld '%world%' not found."
+
+    stop:
+      usage: "&eUsage: /olmeteor stop <eventId>"
+      no_event: "&cNo active event found with ID: &e%eventId%"
+      success: "&aEvent &e%eventId% &astop initiated. Rollback in progress."
+
+    cancel:
+      usage: "&eUsage: /olmeteor cancel <eventId>"
+      no_event: "&cNo active event found with ID: &e%eventId%"
+      success: "&cEvent &e%eventId% &chas been cancelled."
+
+    list:
+      title: "&6&l=== Active OlMeteor ==="
+      empty: "&eThere are no active meteor events."
+      entry: "&7- &f%eventId% &7| Type: &f%type% &7| World: &f%world% &7| %location%"
+
+    info:
+      title: "&6&l=== Meteor Event Info ==="
+      no_event: "&cNo active event found with ID: &e%eventId%"
+      id: "&7ID: &f%eventId%"
+      type: "&7Type: &f%type%"
+      phase: "&7Phase: &f%phase%"
+      world: "&7World: &f%world%"
+      location: "&7Location: &f%location%"
+      radius: "&7Radius: &f%radius% blocks"
+      schematic: "&7Schematic: &f%schematic%"
+      distance: "&7Distance to &e%player%&7: &f%distance% blocks"
+
+    spawnat:
+      usage: "&eUsage: /olmeteor spawnat <type> <x> <y> <z> [world]"
+
+  # ── Display entity messages (holograms, floating text) ──
+  display:
+    vault_hologram: "&6&l✦ Vault &7| &eKeys: &f%count%"
+
+  # ── Custom item display names and lore ──
+  item:
+    meteor_key:
+      name: "&6&l✦ Meteor Key"
+      lore: |
+        &7A key forged from celestial fragments.
+        &7Used to unlock the Meteor Vault.
+        
+        &6✦ Meteor Type: &e%meteor_type%
+        &7✦ &8One-time use
+        &7✦ &8Personal loot only
+        
+        &e&lRight-click on the Meteor Vault to open!
+    setup_wand:
+      name: "&6&l✦ Meteor Setup Wand"
+      lore: |
+        &6&l=== Region Selection Tool ===
+        &eLeft Click &7- Set position 1
+        &eRight Click &7- Set position 2
+        
+        &7Select the area where the
+        &7meteor will impact.
+    mob_spawn_tool:
+      name: "&6&l✦ Spawn Point Marker"
+      lore: |
+        &6&l=== Mob Spawn Point Tool ===
+        &eRight Click &7- Set a spawn point
+        
+        &7Mark locations where MythicMobs
+        &7or standard mobs will spawn.
+    loot_editor_item:
+      name: "&6&l✦ Loot Editor"
+      lore: |
+        &6&l=== Loot Editor ===
+        &ePlace on ground &7- Open loot GUI
+        
+        &7Configure the loot table for
+        &7the meteor event rewards.
+        
+        &8Click items in the GUI to
+        &8configure drop chances and amounts.
+    safe_exit:
+      name: "&a&l✦ Safe Exit"
+      lore: |
+        &6&l=== Safe Exit ===
+        &eRight Click &7- Save and exit setup mode
+        
+        &7Your inventory will be restored
+        &7and all setup data will be saved.
+        
+        &a&l✔ Click to safely exit!
+    meteor_core:
+      name: "&6&l★ Meteor Core"
+      lore: "&7The burning heart of a fallen star."
+    wind_charge:
+      name: "&b&l✦ Gale Force Charge"
+      lore: |
+        &7A concentrated blast of wind,
+        &7capable of launching enemies skyward.
+    mace:
+      name: "&6&l✦ Meteorite Mace"
+      lore: |
+        &7Forged from the core of a fallen meteor,
+        &7this mace crackles with celestial energy.
+        
+        &6Density %density_level%
+        &6Breach %breach_level%
+        &6Wind Burst %wind_burst_level%
+
+  # ── Event broadcast messages ──
+  event:
+    broadcast:
+      incoming: "%color%&l⚠ %name% &eis incoming! &c%seconds%s remaining\n&8➜ &b%world% &8• &7X: &f%x% &8• &7Y: &f%y% &8• &7Z: &f%z%"
+      impacting: "%color%&l💥 %name% &eIMPACTED!\n&8➜ &b%world% &8• &7X: &f%x% &8• &7Y: &f%y% &8• &7Z: &f%z%"
+      active: "%color%&l⚔ %name% &eis now active! Defeat the boss to claim the vault!"
+      wave: "&6&l⚔ %name% &eWave &f%wave%&7/&f%total% &estarted!"
+      all_chests_opened: "&a&lAll reward chests have been opened! &eThe meteor area will be removed in &c10 seconds&e."
+      rollback: "%color%&l🔄 %name% &earea is being restored..."
+      restored: "%color%&l✅ %name% &aarea has been fully restored!"
+      cancelled: "%color%&l%name% &cevent has been cancelled!"
+
+  # ── Boss messages ──
+  boss:
+    custom_name: "&6&l✦ Meteor Boss ✦"
+
+  # ── Hazard messages ──
+  hazard:
+    radiation:
+      actionbar: "&c&l☢ RADIATION &7| &e%health% &c❤"
+    wind:
+      actionbar: "&b&l🌪 WIND BLAST! &7You were pushed back!"
+    emp:
+      elytra: "&c&l⚡ EMP FIELD &7| &eElytra systems disabled!"
+      elytra_block: "&c&l⚡ EMP FIELD &7| &eElytra cannot be deployed here!"
+      pearl_block: "&c&l⚡ EMP FIELD &7| &eEnder Pearls are disabled in this zone!"
+
+  # ── Vault messages ──
+  vault:
+    locked: "&c&l✦ Vault Locked! &7Defeat the meteor boss first!"
+    key_required: "&c&l✦ Key Required! &7You need a Meteor Key to open this vault."
+    already_opened: "&c&l✦ You have already claimed the loot from this vault!"
+    opened: "&6&l✦ Vault Opened! &7You received your personal loot."
+    opened_shared: "&6&l✦ Shared loot opened! &7All players use the same inventory."
+    mine_to_open: "&eMine this block to open its reward."
+    interact_to_open: "&eRight-click this loot block to open it."
+    inactive: "&cThe reward block is not active yet."
+    mobs_alive: "&cDefeat every meteor mob before opening the loot."
+    top_only: "&cOnly the top &e%count% &cdamage contributors can open this reward."
+    ranking_reward: "&aYour leaderboard reward was granted! &eRank: #%rank%"
+    key_received: "&6&l✦ Meteor Key Received! &7You dealt %damage%% &7damage to the boss."
+
+  # ── Setup mode messages ──
+  setup:
+    choice:
+      title: "&7How would you like to configure &6%type%&7?"
+      create_new: "&a&l[CREATE FROM SCRATCH]"
+      create_new_hover: "&7Select two corners in the world and create a new schematic."
+      existing_title: "&eClick a saved schematic to select it:"
+      existing_entry: "&b➤ &f%name%"
+      existing_hover: "&7Assign &e%name% &7to this meteor type."
+      no_schematics: "&eNo schematics are saved yet. Use Create From Scratch."
+      not_found: "&cSchematic %name% was not found."
+      assigned: "&aAssigned %name% to meteor type &e%type%&a."
+    entered: |
+      &6&l✦ METEOR SETUP MODE ✦
+      &7You are configuring: &e%type%
+      &7Use the items in your hotbar to configure the event.
+      &7Use &e/olmeteor setup &7again or click the &aSafe Exit&7 item to exit.
+    exited: "&aInventory restored. Exited setup mode."
+    exit_failed: "&eCould not restore inventory from backup. Your inventory has been cleared."
+    backup_failed: "&cFailed to backup inventory. Setup mode aborted."
+    pos1_set: "&aPosition 1 set: &e%location%"
+    pos2_set: "&aPosition 2 set: &e%location%"
+    region_selected: "&7Region selected: %size% blocks"
+    schematic:
+      not_in_setup: "&cEnter setup mode first with &e/olmeteor setup <type>&c."
+      select_region_first: "&cSelect both corners with the setup wand first."
+      same_world_required: "&cBoth selection points must be in the same world."
+      invalid_name: "&cInvalid name. Use only a-z, 0-9, underscores and hyphens."
+      fawe_required: "&cFAWE or WorldEdit is required to save schematics."
+      saving: "&7Saving schematic &e%name%&7..."
+      saved: "&aSaved %name% and assigned it to meteor type &e%type%&a."
+      failed: "&cCould not save %name%. Check the server console."
+      config_failed: "&eSaved %name%, but its config setting could not be written."
+    mob_spawn_added: "&aMob spawn point added at: &e%location%"
+    mob_spawn_total: "&7Total spawn points: &e%count%"
+    loot_editor_opened: "&7Loot Editor opened for &e%type%"
+    command_blocked: "&cThis command is disabled while in setup mode. Use &e/olmeteor setup &7to exit."
+    command_not_allowed: "&cThis command is not allowed while in setup mode."
+    tool_slot_filler: "&7✦ Setup Tool Slot ✦"
+    # ── Setup action bar (live status display) ──
+    actionbar:
+      template: "&eLMB: %pos1_status% &7| &eRMB: %pos2_status% &7| &dMob Points: %mob_count% &7| &6Type: &e%type%"
+      pos1_saved: "&aP1 saved"
+      pos1_pending: "&7P1 pending"
+      pos2_saved: "&aP2 saved"
+      pos2_pending: "&7P2 pending"
+
+  # ── Loot Editor messages ──
+  loot_editor:
+    opened: "&7Loot Editor opened for &e%type%"
+    drag_hint: "&7Drag items into the grid to add them to the loot table."
+    click_hint: "&7Click items in the grid to configure chances and amounts."
+    cleared: "&aLoot table cleared."
+    reset: "&aLoot table restored to this meteor type's defaults. Press the green button to save."
+    discarded: "&eClosed without saving changes."
+    saved: "&aLoot table saved for &e%type%"
+    added: "&aItem added to loot table."
+    removed: "&aItem removed from loot table."
+    selected: "&7Selected item in slot %slot%. Use control panel to edit."
+    select_first: "&eFirst click an item in the grid to select it."
+    item_locked: "&aItem locked."
+    item_unlocked: "&aItem unlocked."
+    cancelled: "&7Edit cancelled. Reopening editor..."
+    no_longer_exists: "&cThe item you were editing no longer exists in the loot table."
+    chance_changed: "&7Drop chance updated: &e%old%% &7→ &e%new%%"
+    amount_changed: "&7Amount range updated: &e%old% &7→ &e%new%"
+    chance_prompt: |
+      
+      &6&l✦ Edit Drop Chance
+      &7Current: &e%current%%
+      &7Enter a value between &e0.1&7 and &e100.0&7:
+      &7Type &e0&7 to cancel.
+      
+    amount_prompt: |
+      
+      &6&l✦ Edit Amount Range
+      &7Current: &e%current%
+      &7Enter min and max separated by a space:
+      &7Example: &e1 5
+      &7Type &e0&7 to cancel.
+      
+    chance_error: "&cInvalid chance value. Please enter a number between 0.1 and 100.0"
+    chance_retry: "&7Type the new chance or &e0&7 to cancel:"
+    amount_error: "&cInvalid amount range. Please enter two numbers separated by a space (e.g., &e1 5&c)"
+    amount_retry: "&7Type min and max amount or &e0&7 to cancel:"
+    unexpected_error: "&cAn unexpected error occurred. Please try again."
+    # ── GUI display strings ──
+    gui:
+      title_prefix: "&6&l✦ Meteor Loot Editor &8- &7"
+      item_separator: "&8&m----------------------"
+      locked_yes: "&aYes"
+      locked_no: "&cNo"
+      locked_status: "&7Locked: %status%"
+      drop_chance: "&7Drop Chance: &e%chance%%"
+      amount_range: "&7Amount: &e%min% - &e%max%"
+      selected_status: "&a✔ Selected item"
+      left_click: "&7Left-click: Edit chance"
+      right_click: "&7Right-click: Edit amount"
+      shift_click: "&7Shift+Click: Toggle locked"
+      q_drop: "&7Q/Drop: Remove item"
+      info_name: "&6&lLoot Table Info"
+      info_type: "&7Type: &e%type%"
+      info_items: "&7Items: &e%count%"
+      info_difficulty: "&7Difficulty: %color%%difficulty%"
+      chance_name: "&6Edit Chance"
+      chance_lore: |
+        &7Click an item in the grid,
+        &7then click here to edit its
+        &7drop chance (&e0.1% - 100%&7).
+      amount_name: "&6Edit Amount"
+      amount_lore: |
+        &7Click an item in the grid,
+        &7then click here to edit its
+        &7minimum and maximum amount.
+      lock_name: "&6Toggle Lock"
+      lock_lore: |
+        &7Click an item in the grid,
+        &7then click here to toggle
+        &7whether it requires a special key.
+      reset_name: "&e&lRestore Defaults"
+      reset_lore: |
+        &7Reloads the starting loot for
+        &7this meteor type.
+      clear_name: "&c&lClear All Items"
+      clear_lore: |
+        &7Removes all items from
+        &7the loot table.
+      cancel_name: "&cClose Without Saving"
+      cancel_lore: |
+        &7Discards this session's changes
+        &7and closes the menu.
+      save_name: "&a&l✔ Save & Close"
+      save_lore: |
+        &7Saves the current loot table
+        &7and closes the editor.
+
+  # ── Message Util Prefixes ──
+  message_prefix:
+    chat: "&8[&6Ol&eMeteor&8] &r"
+    broadcast: "&8[&6Ol&eMeteor&8] &r"
+    warning: "&e&l⚠ &6Warning: &e"
+    error: "&4&l✘ &cError: &4"
+    success: "&a&l✔ &2"
+    info: "&8[&bℹ&8] &7"
+
+  # ── Meteor Type Display Names & Colors ──
+  meteor_type:
+    small:
+      name: "Small Meteor"
+      color: "&a"
+    medium:
+      name: "Medium Meteor"
+      color: "&e"
+    large:
+      name: "Large Meteor"
+      color: "&c"
+    epic:
+      name: "Epic Meteor"
+      color: "&5"
+    legendary:
+      name: "Legendary Meteor"
+      color: "&6"
+    difficulty:
+      easy:
+        name: "Easy"
+        color: "&a"
+      normal:
+        name: "Normal"
+        color: "&e"
+      hard:
+        name: "Hard"
+        color: "&c"
+      epic:
+        name: "Epic"
+        color: "&5"
+      legendary:
+        name: "Legendary"
+        color: "&6"
+

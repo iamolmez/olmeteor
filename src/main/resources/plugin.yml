@@ -1,0 +1,112 @@
+name: '${name}'
+version: '${version}'
+description: '${description}'
+main: com.olmeteors.meteorevents.MeteorPlugin
+api-version: '1.21'
+folia-supported: true
+
+author: OlMeteor Development Team
+website: https://olmeteors.com
+
+load: POSTWORLD
+
+# ── DEPENDENCIES ──────────────────────────────────────────────
+# Hard dependency: Paper loads and enables CommandAPI before OlMeteor.
+# onEnable also validates it so an externally disabled dependency is handled safely.
+depend:
+  - CommandAPI
+
+# Optional integrations: these establish load order when installed, but do not
+# prevent OlMeteor from loading when absent. Never move their APIs into depend
+# unless the corresponding feature becomes mandatory for the whole plugin.
+softdepend:
+  - FastAsyncWorldEdit # Async schematic pasting + terrain rollback
+  - WorldEdit          # Compatibility fallback when FAWE is not installed
+  - WorldGuard         # Dynamic event region protection
+  - Towny              # Claim conflict detection
+  - MythicMobs         # Custom boss mechanics
+  - PlaceholderAPI     # Placeholder expansion for scoreboard/chat
+  - ItemsAdder         # Custom item metadata is preserved in chest loot imports
+  - FancyHolograms     # Optional hologram provider
+  - NBTAPI             # Optional custom NBT integration; native item bytes work without it
+
+# Commands and permissions are registered programmatically via CommandAPI.
+# See MeteorCommand.java for the full command tree.
+permissions:
+  olmeteor.*:
+    description: 'Wildcard — grants all OlMeteor permissions'
+    default: op
+    children:
+      olmeteor.admin: true
+      olmeteor.setup: true
+      olmeteor.start: true
+      olmeteor.stop: true
+      olmeteor.cancel: true
+      olmeteor.reload: true
+      olmeteor.list: true
+      olmeteor.info: true
+      olmeteor.wand: true
+      olmeteor.spawnat: true
+      olmeteor.auto: true
+      olmeteor.history: true
+      olmeteor.preset: true
+
+  olmeteor.admin:
+    description: 'Full access to all OlMeteor commands'
+    default: op
+    children:
+      olmeteor.setup: true
+      olmeteor.start: true
+      olmeteor.stop: true
+      olmeteor.cancel: true
+      olmeteor.reload: true
+      olmeteor.list: true
+      olmeteor.info: true
+      olmeteor.wand: true
+      olmeteor.spawnat: true
+      olmeteor.auto: true
+      olmeteor.history: true
+      olmeteor.preset: true
+
+  olmeteor.setup:
+    description: 'Access to setup mode'
+    default: op
+  olmeteor.start:
+    description: 'Access to start meteor events'
+    default: op
+  olmeteor.spawnat:
+    description: 'Access to spawn meteor events at specific coordinates'
+    default: op
+  olmeteor.stop:
+    description: 'Access to stop meteor events'
+    default: op
+  olmeteor.cancel:
+    description: 'Access to cancel meteor events'
+    default: op
+  olmeteor.reload:
+    description: 'Access to reload configuration'
+    default: op
+  olmeteor.list:
+    description: 'Access to list active events'
+    default: op
+  olmeteor.info:
+    description: 'Access to view event details'
+    default: op
+  olmeteor.wand:
+    description: 'Access to receive the setup wand'
+    default: op
+  olmeteor.auto:
+    description: 'Otomatik meteor planını yönetir'
+    default: op
+  olmeteor.history:
+    description: 'Meteor çarpma geçmişini görüntüler'
+    default: op
+  olmeteor.preset:
+    description: 'Otomatik meteor konum presetini değiştirir'
+    default: op
+  olmeteor.participate:
+    description: 'Allows participation in meteor events'
+    default: true
+  olmeteor.bypass.hazards:
+    description: 'Allows bypassing event hazards (radiation, EMP, etc.)'
+    default: false

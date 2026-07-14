@@ -1,0 +1,41 @@
+# OlMeteor komut yardım kategorileri
+# Sıralama bu dosyadaki sıraya göre gösterilir.
+# enabled: false ile kategori yardım menüsünden gizlenebilir.
+
+categories:
+  event:
+    enabled: true
+    title: "&6&lEtkinlik Komutları"
+    commands:
+      - "&e/olmeteor start <tip> [dünya] [yarıçap] &7- Meteor başlatır"
+      - "&e/olmeteor spawnat <tip> <konum> [dünya] [mod] &7- Belirlenen konumda başlatır"
+      - "&e/olmeteor stop <id> &7- Güvenli biçimde bitirip alanı geri yükler"
+      - "&e/olmeteor list &7- Aktif meteorları gösterir"
+      - "&e/olmeteor info <id> &7- Meteor ayrıntılarını gösterir"
+      - "&e/olmeteor history [adet] &7- Çarpma saati, konumu ve sonucunu gösterir"
+
+  setup:
+    enabled: true
+    title: "&d&lKurulum Komutları"
+    commands:
+      - "&e/olmeteor setup <tip> &7- Kurulum menüsünü açar"
+      - "&e/olmeteor editschematic <tip> <isim> &7- Kayıtlı kurulumu düzenler"
+      - "&e/olmeteor schematic <isim> &7- Seçimi schematic olarak kaydeder"
+
+  rewards:
+    enabled: true
+    title: "&a&lÖdül Komutları"
+    commands:
+      - "&e/olmeteor loot <tip> &7- Loot tablosunu düzenler"
+
+  admin:
+    enabled: true
+    title: "&c&lYönetim Komutları"
+    commands:
+      - "&e/olmeteor reload &7- Ayarları yeniler"
+      - "&e/olmeteor cancel <id> &7- Etkinliği iptal eder"
+      - "&e/olmeteor auto durum &7- Otomatik meteor planını gösterir"
+      - "&e/olmeteor auto ac|kapat &7- Otomatik sistemi açar veya kapatır"
+      - "&e/olmeteor auto simdi &7- Hemen rastgele meteor başlatır"
+      - "&e/olmeteor auto sonraki <dakika> &7- Sonraki meteoru planlar"
+      - "&e/olmeteor preset <isim> [minY] [maxY] &7- Spawn konum presetini seçer"

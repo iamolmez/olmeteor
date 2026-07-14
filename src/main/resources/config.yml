@@ -1,0 +1,833 @@
+# ═══════════════════════════════════════════════════════════════
+#  OlMeteor - Meteor Event Plugin Configuration
+#  Version: 1.3.0
+#  For Paper/Folia 1.21.1+
+# ═══════════════════════════════════════════════════════════════
+
+# ────────────────────────────────────────────────────────────────
+#  LOCALE / LANGUAGE
+#  - "auto" : auto-detect from JVM system locale
+#  - "en"   : force English
+#  - "tr"   : force Turkish
+#  Add your own by placing messages_XX.yml in the lang/ folder.
+# ────────────────────────────────────────────────────────────────
+locale: auto
+
+# false: selected lang/messages_XX.yml is used (recommended)
+# true: the legacy messages section below overrides the selected language
+locale-config-overrides: false
+
+integrations:
+  nbt-api:
+    # NBT-API yüklüyse güvenli soft-hook yapılır. Yüklü olmasa da native byte codec,
+    # vanilla/custom NBT, PDC ve 1.21 Data Components verilerini eksiksiz saklar.
+    enabled: true
+
+# /olmeteor yardım menüsündeki kategoriler tamamen buradan düzenlenir.
+# Başlık, sıralama, görünen komutlar ve kategorinin açık/kapalı olması değiştirilebilir.
+command-help:
+  categories:
+    event:
+      enabled: true
+      title: "&6&lEtkinlik Komutları"
+      commands:
+        - "&e/olmeteor start <tip> [dünya] [yarıçap] &7- Meteor başlatır"
+        - "&e/olmeteor spawnat <tip> <konum> [dünya] [mod] &7- Belirlenen konumda başlatır"
+        - "&e/olmeteor stop <id> &7- Güvenli biçimde bitirip alanı geri yükler"
+        - "&e/olmeteor list &7- Aktif meteorları gösterir"
+        - "&e/olmeteor info <id> &7- Meteor ayrıntılarını gösterir"
+        - "&e/olmeteor history [adet] &7- Çarpma saati, konumu ve sonucunu gösterir"
+    setup:
+      enabled: true
+      title: "&d&lKurulum Komutları"
+      commands:
+        - "&e/olmeteor setup <tip> &7- Kurulum menüsünü açar"
+        - "&e/olmeteor editschematic <tip> <isim> &7- Kayıtlı kurulumu düzenler"
+        - "&e/olmeteor schematic <isim> &7- Seçimi schematic olarak kaydeder"
+    rewards:
+      enabled: true
+      title: "&a&lÖdül Komutları"
+      commands:
+        - "&e/olmeteor loot <tip> &7- Loot tablosunu düzenler"
+    admin:
+      enabled: true
+      title: "&c&lYönetim Komutları"
+      commands:
+        - "&e/olmeteor reload &7- Ayarları yeniler"
+        - "&e/olmeteor cancel <id> &7- Etkinliği iptal eder"
+        - "&e/olmeteor auto durum &7- Otomatik meteor planını gösterir"
+        - "&e/olmeteor auto &7- Oyun içi auto ayar menüsünü açar"
+        - "&e/olmeteor auto ac|kapat &7- Otomatik sistemi açar veya kapatır"
+        - "&e/olmeteor auto simdi &7- Hemen rastgele meteor başlatır"
+        - "&e/olmeteor debug &7- Entegrasyon ve kurtarma durumunu kontrol eder"
+        - "&e/olmeteor preview <meteor> &7- Alanı blok koymadan önizler"
+        - "&e/olmeteor stats [oyuncu] &7- Kalıcı meteor istatistiklerini gösterir"
+        - "&e/olmeteor ticket <oyuncu> <meteor> [adet] &7- Güvenli çağırma bileti verir"
+        - "&e/olmeteor auto ayarla <meteorlar> <dünya> <preset> <ganimetBloğu> <minDk> <maxDk> <minUzaklık> <maxUzaklık> [minY] [maxY]"
+        - "&e/olmeteor preset <isim> [minY] [maxY] &7- Spawn konum presetini seçer"
+
+# Otomatik meteor sistemi. Her tetiklemede uygun konum güvenli şekilde aranır.
+automatic-events:
+  enabled: true
+  min-interval-minutes: 30
+  max-interval-minutes: 60
+  # Yalnızca otomatik meteorlar için dünya spawnından aranacak uzaklık.
+  min-distance-from-spawn: 100
+  max-distance-from-spawn: 5000
+  tps-guard:
+    enabled: true
+    minimum-tps: 18.0
+    retry-minutes: 5
+  location-cooldown:
+    enabled: true
+    radius: 1000
+    hours: 24
+  max-active-events: 1
+  # Boş bırakılırsa yüklü dünyalardan biri seçilir.
+  worlds: []
+  # Dünya kuralı yoksa bu konum preseti kullanılır.
+  default-location-preset: "flat_surface"
+  # Komut örneği: /olmeteor auto dunya world grass_surface 5
+  # Ağırlığı yüksek dünya daha sık seçilir. enabled: false o dünyayı kapatır.
+  world-settings: {}
+  meteor-types:
+    - small
+    - medium
+    - large
+
+# ────────────────────────────────────────────────────────────────
+#  SCHEMATIC SETTINGS
+# ────────────────────────────────────────────────────────────────
+schematic:
+  # Default schematic to paste at impact site
+  # Place .schem or .schematic files in the 'schematics/' folder
+  default: "meteor_crater.schem"
+
+# ────────────────────────────────────────────────────────────────
+#  LOCATION FINDER SETTINGS
+# ────────────────────────────────────────────────────────────────
+location-finder:
+  # Hazır seçenekler: flat_surface, water_surface, underground, air, any_surface
+  active-preset: "flat_surface"
+  presets:
+    flat_surface:
+      mode: "surface"
+      require-flat: true
+      allow-water: false
+      allow-lava: false
+      min-y: -64
+      max-y: 320
+      allowed-floor-blocks: []
+    water_surface:
+      mode: "surface"
+      require-flat: true
+      allow-water: true
+      allow-lava: false
+      min-y: 50
+      max-y: 320
+      allowed-floor-blocks: []
+    underground:
+      mode: "underground"
+      require-flat: false
+      allow-water: true
+      allow-lava: false
+      min-y: -48
+      max-y: 40
+      allowed-floor-blocks: []
+    air:
+      mode: "air"
+      require-flat: false
+      allow-water: true
+      allow-lava: true
+      min-y: 100
+      max-y: 220
+      allowed-floor-blocks: []
+    any_surface:
+      mode: "surface"
+      require-flat: false
+      allow-water: true
+      allow-lava: false
+      min-y: -64
+      max-y: 320
+      allowed-floor-blocks: []
+    grass_surface:
+      mode: "surface"
+      require-flat: true
+      allow-water: false
+      allow-lava: false
+      min-y: 55
+      max-y: 320
+      allowed-floor-blocks: [GRASS_BLOCK, DIRT, COARSE_DIRT, PODZOL, MOSS_BLOCK]
+    desert_surface:
+      mode: "surface"
+      require-flat: true
+      allow-water: false
+      allow-lava: false
+      min-y: 45
+      max-y: 320
+      allowed-floor-blocks: [SAND, RED_SAND, SANDSTONE, RED_SANDSTONE]
+    nether_surface:
+      mode: "surface"
+      require-flat: false
+      allow-water: false
+      allow-lava: false
+      min-y: 20
+      max-y: 120
+      allowed-floor-blocks: [NETHERRACK, SOUL_SAND, SOUL_SOIL, BLACKSTONE, BASALT]
+    end_surface:
+      mode: "surface"
+      require-flat: true
+      allow-water: false
+      allow-lava: false
+      min-y: 0
+      max-y: 200
+      allowed-floor-blocks: [END_STONE]
+  # Maximum attempts to find a suitable location before cancelling
+  max-attempts: 30
+
+  # Minimum buffer distance from claimed areas (WorldGuard/Towny)
+  buffer-zone-from-claims: 50
+
+  # Maximum terrain height variance tolerance (blocks)
+  # Higher values allow more uneven terrain
+  terrain-variance-tolerance: 5
+
+  # Minimum distance from world spawn for event location
+  min-distance-from-spawn: 100
+
+  # Maximum distance from world spawn for event location
+  max-distance-from-spawn: 5000
+
+  # Towny integration - require wilderness areas only
+  towny-require-wilderness: true
+
+  # WorldGuard regionlerine meteor düşmesini engeller.
+  worldguard-check-claims: true
+
+# ────────────────────────────────────────────────────────────────
+#  EVENT SETTINGS
+# ────────────────────────────────────────────────────────────────
+event:
+  tickets:
+    material: "FIRE_CHARGE"
+    cooldown-seconds: 300
+  waves:
+    count: 3
+    interval-seconds: 15
+  # Çökme/restart sonrasında yarım kalan meteor alanını disk snapshotından geri yükler.
+  recovery:
+    enabled: true
+  tracking:
+    enabled: true
+    max-distance: 2000
+  # Chunk force-load radius (in chunks)
+  chunk-force-load-radius: 3
+
+  # Tüm meteor yaratıkları öldükten sonra oyuncuların sandıkları açabilmesi
+  # için tanınan süre. Süre dolunca sandık açılsa da açılmasa da alan geri alınır.
+  completion:
+    cleanup-delay-seconds: 60
+    # Hiç oyuncu gelmez/hasar vermezse eventin kaldırılacağı süre.
+    unattended-timeout-minutes: 30
+
+  combat-feedback:
+    damage-actionbar: true
+    kill-actionbar: true
+    broadcast-leaderboard: true
+    leaderboard-size: 5
+    damage-actionbar-text: "&cHasar: &f%damage% &8| &eSıra: #%rank%"
+    kill-actionbar-text: "&aMob öldürüldü! &7Kalan: &e%remaining% &8| &6Sıra: #%rank%"
+    leaderboard-title: "&6&lMeteor Hasar Sıralaması"
+    leaderboard-empty: "&7Bu meteor için oyuncu hasarı kaydedilmedi."
+    leaderboard-entry: "&e#%rank% &f%player% &7- &c%damage% hasar"
+
+  fall:
+    normal-height: 80
+    slow-height: 120
+    # false ise çarpışmadan sonra havada dönen meteor topu oluşturulmaz.
+    show-impact-core: false
+
+  # ────────── HAZARDS ──────────
+  hazards:
+    # Radiation damage per second (Wither effect)
+    radiation-damage-per-second: 2
+
+    # Wind Charge knockback multiplier
+    wind-charge-knockback-multiplier: 1.5
+
+    # Interval between wind charge waves (in ticks, 20 = 1 second)
+    wind-charge-interval-ticks: 100
+
+    # Disable Elytra flight within event zone (EMP field)
+    disable-elytra: true
+
+    # Disable Ender Pearls within event zone (EMP field)
+    disable-ender-pearl: true
+
+  # ────────── VAULT ──────────
+  vault:
+    # Bu blok kazılmaya çalışılınca kişisel loot envanteri açılır.
+    loot-block: "ANCIENT_DEBRIS"
+    # Minimum boss damage threshold (%) to receive a vault key
+    boss-damage-threshold-percent: 10
+
+    # Delay (in ticks) before vault can be opened after boss defeat
+    open-delay-ticks: 100
+    # Hasar sıralamasında ödül sandığını açabilecek oyuncu sayısı
+    reward-top-count: 3
+
+# ────────────────────────────────────────────────────────────────
+#  METEOR TYPE CONFIGURATIONS
+# ────────────────────────────────────────────────────────────────
+meteor-types:
+  small:
+    # Event sonunda snapshot geri yüklensin; oyuncuların kırdığı/eklediği bloklar da düzelir.
+    restore-structure-on-finish: true
+    loot:
+      # Minecraft'taki herhangi bir blok adı kullanılabilir (CHEST, BARREL, STONE vb.).
+      block: "CHEST"
+      # AUTO: etkileşimli blok sağ tık, diğer blok kazma. Alternatif: INTERACT, BREAK, BOTH.
+      access-mode: "AUTO"
+      # true: her hak sahibine ayrı ganimet, false: herkes için tek ortak envanter.
+      personal: true
+      inventory-title: "Küçük Meteor Ödülü"
+    combat-feedback:
+      damage-actionbar: true
+      kill-actionbar: true
+      broadcast-leaderboard: true
+      leaderboard-size: 5
+    fall-mode: "normal"
+    normal-fall-duration-seconds: 8
+    slow-fall-duration-seconds: 18
+    # Duration of pre-impact warning phase (seconds)
+    pre-impact-duration-seconds: 30
+    # Duration of the active event phase (seconds)
+    event-duration-seconds: 300
+    # Duration of rollback phase (seconds)
+    rollback-duration-seconds: 30
+    # Impact radius (blocks)
+    impact-radius: 15
+    # Boss health multiplier
+    boss-health-multiplier: 1.0
+    # Commands to execute when a player opens the vault
+    # Use %player% as placeholder for the player name
+    rewards-commands:
+      - "give %player% diamond 1"
+      - "xp give %player% 100 points"
+    # MATERIAL:adet biçimi. ItemsAdder ödülleri için aşağıdaki commands alanında
+    # örneğin: "iagive %player% namespace:item 1" kullanılabilir.
+    rewards-items: []
+    ranking-rewards:
+      "1":
+        items: []
+        commands: []
+      "2":
+        items: []
+        commands: []
+      "3":
+        items: []
+        commands: []
+    # MythicMobs boss identifier (leave empty to disable)
+    boss-mythicmob: ""
+    # /olmeteor selectmob ile seçilen normal MythicMobs mobları
+    mythicmobs: []
+    mob-spawn-offsets: []
+    hologram-offsets: []
+    chest-offsets: []
+    hologram-text: "&6Küçük Meteor"
+    mythicmob-chances: {}
+    # Schematic file override (leave empty for default)
+    schematic: ""
+
+  medium:
+    restore-structure-on-finish: true
+    loot:
+      block: "BARREL"
+      access-mode: "AUTO"
+      personal: true
+      inventory-title: "Orta Meteor Ödülü"
+    combat-feedback:
+      damage-actionbar: true
+      kill-actionbar: true
+      broadcast-leaderboard: true
+      leaderboard-size: 5
+    fall-mode: "normal"
+    normal-fall-duration-seconds: 8
+    slow-fall-duration-seconds: 18
+    pre-impact-duration-seconds: 30
+    event-duration-seconds: 300
+    rollback-duration-seconds: 30
+    impact-radius: 25
+    boss-health-multiplier: 1.5
+    rewards-commands:
+      - "give %player% diamond 2"
+      - "xp give %player% 250 points"
+    rewards-items: []
+    ranking-rewards: {}
+    boss-mythicmob: ""
+    mythicmobs: []
+    mob-spawn-offsets: []
+    hologram-offsets: []
+    chest-offsets: []
+    hologram-text: "&eOrta Meteor"
+    mythicmob-chances: {}
+    schematic: ""
+
+  large:
+    restore-structure-on-finish: true
+    loot:
+      block: "ANCIENT_DEBRIS"
+      access-mode: "AUTO"
+      personal: true
+      inventory-title: "Büyük Meteor Ödülü"
+    combat-feedback:
+      damage-actionbar: true
+      kill-actionbar: true
+      broadcast-leaderboard: true
+      leaderboard-size: 5
+    fall-mode: "normal"
+    normal-fall-duration-seconds: 10
+    slow-fall-duration-seconds: 20
+    pre-impact-duration-seconds: 30
+    event-duration-seconds: 300
+    rollback-duration-seconds: 30
+    impact-radius: 40
+    boss-health-multiplier: 2.0
+    rewards-commands:
+      - "give %player% diamond 3"
+      - "xp give %player% 500 points"
+    rewards-items: []
+    ranking-rewards: {}
+    boss-mythicmob: "MeteorBoss"
+    mythicmobs: []
+    mob-spawn-offsets: []
+    hologram-offsets: []
+    chest-offsets: []
+    hologram-text: "&cBüyük Meteor"
+    mythicmob-chances: {}
+    schematic: ""
+
+  epic:
+    restore-structure-on-finish: true
+    loot:
+      block: "CRYING_OBSIDIAN"
+      access-mode: "AUTO"
+      personal: true
+      inventory-title: "Epik Meteor Ödülü"
+    combat-feedback:
+      damage-actionbar: true
+      kill-actionbar: true
+      broadcast-leaderboard: true
+      leaderboard-size: 5
+    fall-mode: "slow"
+    normal-fall-duration-seconds: 10
+    slow-fall-duration-seconds: 22
+    pre-impact-duration-seconds: 30
+    event-duration-seconds: 300
+    rollback-duration-seconds: 30
+    impact-radius: 60
+    boss-health-multiplier: 3.0
+    rewards-commands:
+      - "give %player% diamond 5"
+      - "give %player% netherite_ingot 1"
+      - "xp give %player% 1000 points"
+    rewards-items: []
+    ranking-rewards: {}
+    boss-mythicmob: "EpicMeteorBoss"
+    mythicmobs: []
+    mob-spawn-offsets: []
+    hologram-offsets: []
+    chest-offsets: []
+    hologram-text: "&5Epik Meteor"
+    mythicmob-chances: {}
+    schematic: ""
+
+  legendary:
+    restore-structure-on-finish: true
+    loot:
+      block: "RESPAWN_ANCHOR"
+      access-mode: "AUTO"
+      personal: true
+      inventory-title: "Efsanevi Meteor Ödülü"
+    combat-feedback:
+      damage-actionbar: true
+      kill-actionbar: true
+      broadcast-leaderboard: true
+      leaderboard-size: 5
+    fall-mode: "slow"
+    normal-fall-duration-seconds: 12
+    slow-fall-duration-seconds: 25
+    pre-impact-duration-seconds: 30
+    event-duration-seconds: 300
+    rollback-duration-seconds: 30
+    impact-radius: 80
+    boss-health-multiplier: 4.0
+    rewards-commands:
+      - "give %player% netherite_ingot 2"
+      - "give %player% dragon_breath 3"
+      - "xp give %player% 2500 points"
+    rewards-items: []
+    ranking-rewards: {}
+    boss-mythicmob: "LegendaryMeteorBoss"
+    mythicmobs: []
+    mob-spawn-offsets: []
+    hologram-offsets: []
+    chest-offsets: []
+    hologram-text: "&6Efsanevi Meteor"
+    mythicmob-chances: {}
+    schematic: ""
+
+# ────────────────────────────────────────────────────────────────
+#  MESSAGE TRANSLATIONS
+#  All user-facing messages can be customised here.
+#  Use & for colour codes. Placeholders: %type%, %eventId%,
+#  %player%, %world%, %radius%, %prefix%, %version%
+# ────────────────────────────────────────────────────────────────
+messages:
+  # ── Command messages ──
+  command:
+    help:
+      title: "&6&l=== OlMeteor Help ==="
+      usage: |
+        &e/olmeteor help &7- Display this help message
+        &e/olmeteor setup <type> &7- Enter visual setup mode
+        &e/olmeteor start <type> [world] [radius] &7- Start a meteor event
+        &e/olmeteor spawnat <type> <xyz> [world] &7- Start at coordinates
+        &e/olmeteor stop <id> &7- Stop and rollback an event
+        &e/olmeteor cancel <id> &7- Cancel an event immediately
+        &e/olmeteor reload &7- Reload configuration
+        &e/olmeteor wand &7- Receive the setup wand
+        &e/olmeteor list &7- List active events
+        &e/olmeteor info <id> [target] &7- Show event details
+    reload:
+      success: "&aConfiguration reloaded successfully."
+    wand:
+      success: "&aSetup wand has been added to your inventory."
+    player_only: "&cThis command can only be executed by a player."
+    no_permission: "&cYou do not have permission to use this command."
+    
+    # ── Setup ──
+    setup:
+      usage: "&eUsage: /olmeteor setup <type>"
+      available_types: "&7Available types: %types%"
+      invalid_type: "&cInvalid meteor type: &e%type%"
+      
+    # ── Start ──
+    start:
+      usage: "&eUsage: /olmeteor start <type> [world]"
+      invalid_type: "&cInvalid meteor type: &e%type%"
+      scheduled: "&aMeteor event &e%eventId% &ascheduled at &e%location%"
+      error: "&cAn error occurred while starting the event: %error%"
+      location_fail: "&cCould not find a suitable location for the meteor event. Try a different world or type."
+      world_not_found: "&cWorld '%world%' not found."
+      
+    # ── Stop ──
+    stop:
+      usage: "&eUsage: /olmeteor stop <eventId>"
+      no_event: "&cNo active event found with ID: &e%eventId%"
+      success: "&aEvent &e%eventId% &astop initiated. Rollback in progress."
+      
+    # ── Cancel ──
+    cancel:
+      usage: "&eUsage: /olmeteor cancel <eventId>"
+      no_event: "&cNo active event found with ID: &e%eventId%"
+      success: "&cEvent &e%eventId% &chas been cancelled."
+      
+    # ── List ──
+    list:
+      title: "&6&l=== Active OlMeteor ==="
+      empty: "&eThere are no active meteor events."
+      entry: "&7- &f%eventId% &7| Type: &f%type% &7| World: &f%world% &7| %location%"
+      
+    # ── Info ──
+    info:
+      title: "&6&l=== Meteor Event Info ==="
+      no_event: "&cNo active event found with ID: &e%eventId%"
+      id: "&7ID: &f%eventId%"
+      type: "&7Type: &f%type%"
+      phase: "&7Phase: &f%phase%"
+      world: "&7World: &f%world%"
+      location: "&7Location: &f%location%"
+      radius: "&7Radius: &f%radius% blocks"
+      schematic: "&7Schematic: &f%schematic%"
+      distance: "&7Distance to &e%player%&7: &f%distance% blocks"
+      
+    # ── Spawnat ──
+    spawnat:
+      usage: "&eUsage: /olmeteor spawnat <type> <x> <y> <z> [world]"
+
+  # ── Display entity messages (holograms, floating text) ──
+  display:
+    vault_hologram: "&6&l✦ Vault &7| &eKeys: &f%count%"
+
+  # ── Custom item display names and lore ──
+  # Each item has .name (display name) and .lore (multi-line lore, split on newlines)
+  item:
+    meteor_key:
+      name: "&6&l✦ Meteor Key"
+      lore: |
+        &7A key forged from celestial fragments.
+        &7Used to unlock the Meteor Vault.
+        
+        &6✦ Meteor Type: &e%meteor_type%
+        &7✦ &8One-time use
+        &7✦ &8Personal loot only
+        
+        &e&lRight-click on the Meteor Vault to open!
+    setup_wand:
+      name: "&6&l✦ Meteor Setup Wand"
+      lore: |
+        &6&l=== Region Selection Tool ===
+        &eLeft Click &7- Set position 1
+        &eRight Click &7- Set position 2
+        
+        &7Select the area where the
+        &7meteor will impact.
+    mob_spawn_tool:
+      name: "&6&l✦ Spawn Point Marker"
+      lore: |
+        &6&l=== Mob Spawn Point Tool ===
+        &eRight Click &7- Set a spawn point
+        
+        &7Mark locations where MythicMobs
+        &7or standard mobs will spawn.
+    loot_editor_item:
+      name: "&6&l✦ Loot Editor"
+      lore: |
+        &6&l=== Loot Editor ===
+        &ePlace on ground &7- Open loot GUI
+        
+        &7Configure the loot table for
+        &7the meteor event rewards.
+        
+        &8Click items in the GUI to
+        &8configure drop chances and amounts.
+    safe_exit:
+      name: "&a&l✦ Safe Exit"
+      lore: |
+        &6&l=== Safe Exit ===
+        &eRight Click &7- Save and exit setup mode
+        
+        &7Your inventory will be restored
+        &7and all setup data will be saved.
+        
+        &a&l✔ Click to safely exit!
+    meteor_core:
+      name: "&6&l★ Meteor Core"
+      lore: "&7The burning heart of a fallen star."
+    wind_charge:
+      name: "&b&l✦ Gale Force Charge"
+      lore: |
+        &7A concentrated blast of wind,
+        &7capable of launching enemies skyward.
+    mace:
+      name: "&6&l✦ Meteorite Mace"
+      lore: |
+        &7Forged from the core of a fallen meteor,
+        &7this mace crackles with celestial energy.
+        
+        &6Density %density_level%
+        &6Breach %breach_level%
+        &6Wind Burst %wind_burst_level%
+
+  # ── Event broadcast messages ──
+  event:
+    broadcast:
+      incoming: "%color%&l⚠ %name% &egeliyor! &c%seconds% saniye\n&8➜ &b%world% &8• &7X: &f%x% &8• &7Y: &f%y% &8• &7Z: &f%z%"
+      impacting: "%color%&l💥 %name% &eÇARPTI!\n&8➜ &b%world% &8• &7X: &f%x% &8• &7Y: &f%y% &8• &7Z: &f%z%"
+      active: "%color%&l⚔ %name% &eis now active! Defeat the boss to claim the vault!"
+      wave: "&6&l⚔ %name% &eDalga &f%wave%&7/&f%total% &ebaşladı!"
+      all_chests_opened: "&a&lTüm ödül sandıkları açıldı! &eMeteor alanı &c10 saniye &esonra silinecek."
+      rollback: "%color%&l🔄 %name% &earea is being restored..."
+      restored: "%color%&l✅ %name% &aarea has been fully restored!"
+      cancelled: "%color%&l%name% &cevent has been cancelled!"
+
+  # ── Boss messages ──
+  boss:
+    custom_name: "&6&l✦ Meteor Boss ✦"
+
+  # ── Hazard messages ──
+  hazard:
+    radiation:
+      actionbar: "&c&l☢ RADIATION &7| &e%health% &c❤"
+    wind:
+      actionbar: "&b&l🌪 WIND BLAST! &7You were pushed back!"
+    emp:
+      elytra: "&c&l⚡ EMP FIELD &7| &eElytra systems disabled!"
+      elytra_block: "&c&l⚡ EMP FIELD &7| &eElytra cannot be deployed here!"
+      pearl_block: "&c&l⚡ EMP FIELD &7| &eEnder Pearls are disabled in this zone!"
+
+  # ── Vault messages ──
+  vault:
+    locked: "&c&l✦ Vault Locked! &7Defeat the meteor boss first!"
+    key_required: "&c&l✦ Key Required! &7You need a Meteor Key to open this vault."
+    already_opened: "&c&l✦ You have already claimed the loot from this vault!"
+    opened: "&6&l✦ Vault Opened! &7You received your personal loot."
+    opened_shared: "&6&l✦ Ortak loot açıldı! &7Eşyalar bütün oyuncular için ortaktır."
+    mine_to_open: "&eÖdülü almak için bu bloğu kazman gerekiyor."
+    interact_to_open: "&eBu loot bloğu sağ tıklanarak açılır."
+    inactive: "&cÖdül bloğu henüz aktif değil."
+    mobs_alive: "&cLoot açılmadan önce bütün meteor mobları öldürülmeli."
+    top_only: "&cBu ödülü yalnızca hasar sıralamasındaki ilk &e%count% &coyuncu açabilir."
+    ranking_reward: "&aHasar sıralaması ödülün verildi! &eSıra: #%rank%"
+    key_received: "&6&l✦ Meteor Key Received! &7You dealt %damage%% &7damage to the boss."
+
+  # ── Setup mode messages ──
+  setup:
+    entered: |
+      &6&l✦ METEOR SETUP MODE ✦
+      &7You are configuring: &e%type%
+      &7Use the items in your hotbar to configure the event.
+      &7Use &e/olmeteor setup &7again or click the &aSafe Exit&7 item to exit.
+    exited: "&aInventory restored. Exited setup mode."
+    exit_failed: "&eCould not restore inventory from backup. Your inventory has been cleared."
+    backup_failed: "&cFailed to backup inventory. Setup mode aborted."
+    pos1_set: "&aPosition 1 set: &e%location%"
+    pos2_set: "&aPosition 2 set: &e%location%"
+    region_selected: "&7Region selected: %size% blocks"
+    mob_spawn_added: "&aMob spawn point added at: &e%location%"
+    mob_spawn_total: "&7Total spawn points: &e%count%"
+    loot_editor_opened: "&7Loot Editor opened for &e%type%"
+    command_blocked: "&cThis command is disabled while in setup mode. Use &e/olmeteor setup &7to exit."
+    command_not_allowed: "&cThis command is not allowed while in setup mode."
+    tool_slot_filler: "&7✦ Setup Tool Slot ✦"
+    # ── Setup action bar (updated continuously while in setup mode) ──
+    actionbar:
+      template: "&eLMB: %pos1_status% &7| &eRMB: %pos2_status% &7| &dMob Points: %mob_count% &7| &6Type: &e%type%"
+      pos1_saved: "&aP1 saved"
+      pos1_pending: "&7P1 pending"
+      pos2_saved: "&aP2 saved"
+      pos2_pending: "&7P2 pending"
+    
+  # ── Loot Editor messages ──
+  loot_editor:
+    opened: "&7Loot Editor opened for &e%type%"
+    drag_hint: "&7Drag items into the grid to add them to the loot table."
+    click_hint: "&7Click items in the grid to configure chances and amounts."
+    cleared: "&aLoot table cleared."
+    reset: "&aLoot table restored to this meteor type's defaults. Press the green button to save."
+    discarded: "&eClosed without saving changes."
+    saved: "&aLoot table saved for &e%type%"
+    added: "&aItem added to loot table."
+    removed: "&aItem removed from loot table."
+    selected: "&7Selected item in slot %slot%. Use control panel to edit."
+    select_first: "&eFirst click an item in the grid to select it."
+    item_locked: "&aItem locked."
+    item_unlocked: "&aItem unlocked."
+    cancelled: "&7Edit cancelled. Reopening editor..."
+    no_longer_exists: "&cThe item you were editing no longer exists in the loot table."
+    chance_changed: "&7Drop chance updated: &e%old%% &7→ &e%new%%"
+    amount_changed: "&7Amount range updated: &e%old% &7→ &e%new%"
+    chance_prompt: |
+      
+      &6&l✦ Edit Drop Chance
+      &7Current: &e%current%%
+      &7Enter a value between &e0.1&7 and &e100.0&7:
+      &7Type &e0&7 to cancel.
+      
+    amount_prompt: |
+      
+      &6&l✦ Edit Amount Range
+      &7Current: &e%current%
+      &7Enter min and max separated by a space:
+      &7Example: &e1 5
+      &7Type &e0&7 to cancel.
+      
+    chance_error: "&cInvalid chance value. Please enter a number between 0.1 and 100.0"
+    chance_retry: "&7Type the new chance or &e0&7 to cancel:"
+    amount_error: "&cInvalid amount range. Please enter two numbers separated by a space (e.g., &e1 5&c)"
+    amount_retry: "&7Type min and max amount or &e0&7 to cancel:"
+    unexpected_error: "&cAn unexpected error occurred. Please try again."
+    # ── GUI display strings (item names, lore, labels shown inside the editor GUI) ──
+    gui:
+      title_prefix: "&6&l✦ Meteor Loot Editor &8- &7"
+      item_separator: "&8&m----------------------"
+      locked_yes: "&aYes"
+      locked_no: "&cNo"
+      locked_status: "&7Locked: %status%"
+      drop_chance: "&7Drop Chance: &e%chance%%"
+      amount_range: "&7Amount: &e%min% - &e%max%"
+      selected_status: "&a✔ Selected item"
+      left_click: "&7Left-click: Edit chance"
+      right_click: "&7Right-click: Edit amount"
+      shift_click: "&7Shift+Click: Toggle locked"
+      q_drop: "&7Q/Drop: Remove item"
+      info_name: "&6&lLoot Table Info"
+      info_type: "&7Type: &e%type%"
+      info_items: "&7Items: &e%count%"
+      info_difficulty: "&7Difficulty: %color%%difficulty%"
+      chance_name: "&6Edit Chance"
+      chance_lore: |
+        &7Click an item in the grid,
+        &7then click here to edit its
+        &7drop chance (&e0.1% - 100%&7).
+      amount_name: "&6Edit Amount"
+      amount_lore: |
+        &7Click an item in the grid,
+        &7then click here to edit its
+        &7minimum and maximum amount.
+      lock_name: "&6Toggle Lock"
+      lock_lore: |
+        &7Click an item in the grid,
+        &7then click here to toggle
+        &7whether it requires a special key.
+      reset_name: "&e&lRestore Defaults"
+      reset_lore: |
+        &7Reloads the starting loot for
+        &7this meteor type.
+      clear_name: "&c&lClear All Items"
+      clear_lore: |
+        &7Removes all items from
+        &7the loot table.
+      cancel_name: "&cClose Without Saving"
+      cancel_lore: |
+        &7Discards this session's changes
+        &7and closes the menu.
+      save_name: "&a&l✔ Save & Close"
+      save_lore: |
+        &7Saves the current loot table
+        &7and closes the editor.
+
+  # ── Message Util Prefixes ──
+  message_prefix:
+    chat: "&8[&6Ol&eMeteor&8] &r"
+    broadcast: "&8[&6Ol&eMeteor&8] &r"
+    warning: "&e&l⚠ &6Warning: &e"
+    error: "&4&l✘ &cError: &4"
+    success: "&a&l✔ &2"
+    info: "&8[&bℹ&8] &7"
+
+  # ── Meteor Type Display Names & Colors ──
+  meteor_type:
+    small:
+      name: "Small Meteor"
+      color: "&a"
+    medium:
+      name: "Medium Meteor"
+      color: "&e"
+    large:
+      name: "Large Meteor"
+      color: "&c"
+    epic:
+      name: "Epic Meteor"
+      color: "&5"
+    legendary:
+      name: "Legendary Meteor"
+      color: "&6"
+    difficulty:
+      easy:
+        name: "Easy"
+        color: "&a"
+      normal:
+        name: "Normal"
+        color: "&e"
+      hard:
+        name: "Hard"
+        color: "&c"
+      epic:
+        name: "Epic"
+        color: "&5"
+      legendary:
+        name: "Legendary"
+        color: "&6"
+
