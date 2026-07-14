@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -48,47 +46,39 @@ jobs:
           path: build/libs/OlMeteor-*.jar
           retention-days: 30
 
-  deploy-wiki:
-    name: Deploy Wiki (GitHub Pages)
-    if: github.event_name == 'push'
+  sync-wiki:
+    name: Sync to GitHub Wiki
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Enable GitHub Pages via API
+      - name: Sync to GitHub Wiki
+        env:
+          WIKI_TOKEN: ${{ secrets.PAT_WIKI }}
+        if: env.WIKI_TOKEN != ''
         run: |
-          curl -L -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.PAT_PAGES }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/${{ github.repository }}/pages \
-            -d '{"build_type":"workflow","source":{"branch":"master","path":"/"}}' \
-            -w "\nHTTP Status: %{http_code}\n" \
-            || echo "Pages already enabled or API error (non-fatal)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git clone https://x-access-token:${{ secrets.PAT_WIKI }}@github.com/${{ github.repository }}.wiki.git .wiki-tmp
 
-      - name: Prepare Pages output
-        run: |
-          mkdir -p _site/wiki/en
+          # Mevcut wiki dosyalarını temizle (Home.md ve _Sidebar.md hariç)
+          find .wiki-tmp -maxdepth 1 -name "*.md" ! -name "Home.md" ! -name "_Sidebar.md" -delete
+          rm -rf .wiki-tmp/en
 
-          # Kopyala: wiki dosyalari
-          cp -r wiki/*.md _site/wiki/
-          cp -r wiki/en/*.md _site/wiki/en/
-          cp -r wiki/en/_Sidebar.md _site/wiki/en/
+          # Türkçe wiki dosyalarını kopyala
+          cp wiki/*.md .wiki-tmp/
+          # İngilizce wiki dosyalarını kopyala
+          mkdir -p .wiki-tmp/en
+          cp wiki/en/*.md .wiki-tmp/en/
 
-          # Landing sayfasi ve .nojekyll
-          cp docs/index.html _site/
-          cp docs/.nojekyll _site/
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          cd .wiki-tmp
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to GitHub Wiki"
+          else
+            git commit -m "🔄 Automated wiki sync from main repository"
+            git push
+          fi
