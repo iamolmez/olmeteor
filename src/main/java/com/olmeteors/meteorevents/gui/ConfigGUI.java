@@ -598,19 +598,21 @@ public final class ConfigGUI implements Listener {
         s.inventory.setItem(11, item(Material.CHEST, "&eGenel Ödül Eşyaları",
                 "&7Bu meteor türü için kasa açılış eşyaları",
                 "&7&lSayı: &f" + config.getRankingRewardItems(type, 0).size()));
-        s.inventory.setItem(14, item(Material.EMERALD, "&6Sıralama Ödülleri &7(#" + s.editRank + ")",
+        final String rankLabel = s.editRank == 0 ? "&6Genel Ödüller" : "&6Sıralama Ödülleri &7(#" + s.editRank + ")";
+        final String slotLabel = s.editRank == 0 ? "&bGenel" : "&bSıra #" + s.editRank;
+        s.inventory.setItem(14, item(Material.EMERALD, rankLabel,
                 "&7Sol/sağ: sırayı değiştir",
                 "&7Düzenlemek için tıkla"));
         // Show rank-specific info
         final List<String> rankItems = config.getRankingRewardItems(type, s.editRank);
         final List<String> rankCmds = config.getRankingRewardCommands(type, s.editRank);
         s.inventory.setItem(15, item(Material.DIAMOND,
-                "&bSıra #" + s.editRank + " &7- Eşyalar",
+                slotLabel + " &7- Eşyalar",
                 rankItems.isEmpty()
                         ? new String[]{"&7Henüz eşya eklenmemiş"}
                         : rankItems.stream().limit(5).map(i -> "&7- " + i).toArray(String[]::new)));
         s.inventory.setItem(16, item(Material.PAPER,
-                "&bSıra #" + s.editRank + " &7- Komutlar",
+                slotLabel + " &7- Komutlar",
                 rankCmds.isEmpty()
                         ? new String[]{"&7Henüz komut eklenmemiş"}
                         : rankCmds.stream().limit(5).map(c -> "&7- " + c).toArray(String[]::new)));
