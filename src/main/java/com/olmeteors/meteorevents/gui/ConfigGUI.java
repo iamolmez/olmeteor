@@ -38,6 +38,7 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_LOOT_EDIT = 9;
     private static final int PAGE_REWARDS_MENU = 10;
     private static final int PAGE_REWARDS_EDIT = 11;
+    private static final int PAGE_TICKET = 12;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -96,6 +97,8 @@ public final class ConfigGUI implements Listener {
         s.cooldownHours = config.getLocationCooldownHours();
         s.lootBlock = Material.matchMaterial(
                 config.getConfig().getString("event.vault.loot-block", "ANCIENT_DEBRIS"));
+        s.ticketMaterial = config.getConfig().getString("event.tickets.material", "FIRE_CHARGE");
+        s.ticketCooldown = config.getConfig().getInt("event.tickets.cooldown-seconds", 300);
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -117,6 +120,8 @@ public final class ConfigGUI implements Listener {
                 "&7Hasar sıralaması, actionbar mesajları"));
         s.inventory.setItem(14, item(Material.ANVIL, "&eDüşüş & Sandık",
                 "&7Düşüş yüksekliği, sandık gecikmesi, eşik"));
+        s.inventory.setItem(13, item(Material.FIRE_CHARGE, "&6Bilet Ayarları",
+                "&7Bilet materyali ve bekleme süresi"));
         s.inventory.setItem(15, item(Material.CLOCK, "&5Otomatik Meteor",
                 "&7Aralık, TPS koruması, konum soğuması"));
         s.inventory.setItem(16, item(Material.FIRE_CHARGE, "&dMeteor Türleri",
@@ -344,6 +349,7 @@ public final class ConfigGUI implements Listener {
             case PAGE_LOOT_EDIT -> handleLootEditClick(s, slot, event);
             case PAGE_REWARDS_MENU -> handleRewardsMenuClick(s, slot, event);
             case PAGE_REWARDS_EDIT -> handleRewardsEditClick(s, slot, event);
+            case PAGE_TICKET -> handleTicketClick(s, slot, event);
         }
     }
 
@@ -353,6 +359,7 @@ public final class ConfigGUI implements Listener {
         else if (slot == 10) drawLocationPage(s);
         else if (slot == 11) drawHazardsPage(s);
         else if (slot == 12) drawCombatPage(s);
+        else if (slot == 13) drawTicketPage(s);
         else if (slot == 14) drawFallVaultPage(s);
         else if (slot == 15) drawAutoPage(s);
         else if (slot == 16) drawTypesMenu(s);
@@ -642,6 +649,53 @@ public final class ConfigGUI implements Listener {
     }
 
     // ────────────────────────────────────────────────────────────────
+    //  TICKET PAGE
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawTicketPage(Session s) {
+        s.page = PAGE_TICKET;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet"));
+        final Material mat = Material.matchMaterial(s.ticketMaterial);
+        s.inventory.setItem(10, item(mat != null ? mat : Material.FIRE_CHARGE,
+                "&6Bilet Materyali: &f" + s.ticketMaterial,
+                "&7İmleçte eşyayla tıkla değiştir",
+                "&7Sol/sağ: önceden tanımlı eşyalar"));
+        s.inventory.setItem(11, item(Material.CLOCK,
+                "&6Bekleme Süresi: &f" + s.ticketCooldown + " sn",
+                "&7Sol/sağ: ±10 &7Shift: ±60"));
+    }
+
+    private void handleTicketClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); drawMainMenu(s); return; }
+        final boolean right = event.isRightClick();
+        final boolean shift = event.isShiftClick();
+        if (slot == 10) changeTicketMaterial(s, event.getCursor(), right ? -1 : 1);
+        else if (slot == 11) s.ticketCooldown = clamp(s.ticketCooldown + (shift ? 60 : 10) * (right ? -1 : 1), 0, 86400);
+        drawTicketPage(s);
+    }
+
+    private static final String[] TICKET_MATERIALS = {"FIRE_CHARGE", "PAPER", "MAP",
+            "NETHER_STAR", "ENDER_PEARL", "ENDER_EYE", "BLAZE_ROD", "BLAZE_POWDER",
+            "MAGMA_CREAM", "GHAST_TEAR", "PHANTOM_MEMBRANE", "ECHO_SHARD", "AMETHYST_SHARD",
+            "EXPERIENCE_BOTTLE", "BOOK", "ENCHANTED_BOOK"};
+
+    private void changeTicketMaterial(Session s, ItemStack cursor, int delta) {
+        if (cursor != null && !cursor.isEmpty() && cursor.getType().isItem()) {
+            s.ticketMaterial = cursor.getType().name();
+            return;
+        }
+        int idx = 0;
+        for (int i = 0; i < TICKET_MATERIALS.length; i++) {
+            if (TICKET_MATERIALS[i].equalsIgnoreCase(s.ticketMaterial)) { idx = i; break; }
+        }
+        s.ticketMaterial = TICKET_MATERIALS[Math.floorMod(idx + delta, TICKET_MATERIALS.length)];
+    }
+
+    // ────────────────────────────────────────────────────────────────
     //  HELPERS
     // ────────────────────────────────────────────────────────────────
 
@@ -762,6 +816,11 @@ public final class ConfigGUI implements Listener {
         if (s.editLootBlock != null && s.editAccessMode != null) {
             saveLootEdits(s);
         }
+        // Ticket
+        if (s.ticketMaterial != null) {
+            fileConfig.set("event.tickets.material", s.ticketMaterial);
+            fileConfig.set("event.tickets.cooldown-seconds", s.ticketCooldown);
+        }
         // Save to disk
         try {
             fileConfig.save(new java.io.File(plugin.getDataFolder(), "config.yml"));
@@ -872,5 +931,8 @@ public final class ConfigGUI implements Listener {
         boolean editPersonalLoot;
         // Rewards edit
         int editRank;
+        // Ticket
+        String ticketMaterial;
+        int ticketCooldown;
     }
 }
