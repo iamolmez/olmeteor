@@ -625,11 +625,13 @@ public final class MeteorCommand {
                 .withSubcommand(presetCmd)
                 .withSubcommand(new CommandAPICommand("ayarlar").withAliases("config","settings")
                         .withPermission(CommandPermission.fromString("olmeteor.admin"))
-                        .executesPlayer((dev.jorel.commandapi.executors.PlayerCommandExecutor) (player, args) ->
-                                plugin.getConfigGUI().open(player)))
-                .withSubcommand(new CommandAPICommand("ayarlar").withAliases("config","settings")
-                        .executes((dev.jorel.commandapi.executors.CommandExecutor) (sender, args) ->
-                                MessageUtil.sendMessage(sender, "&cBu komut sadece oyuncular tarafından kullanılabilir.")))
+                        .executes((dev.jorel.commandapi.executors.CommandExecutor) (sender, args) -> {
+                            if (sender instanceof Player player) {
+                                plugin.getConfigGUI().open(player);
+                            } else {
+                                MessageUtil.sendMessage(sender, "&cConfig ayarları yalnızca oyun içinden açılabilir.");
+                            }
+                        }))
                 .executes(rootExecutor)
                 .register(COMMAND_NAMESPACE);
 
