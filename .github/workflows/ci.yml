@@ -52,29 +52,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout main repository
         uses: actions/checkout@v4
+        with:
+          path: main-repo
 
-      - name: Sync to GitHub Wiki
-        env:
-          WIKI_TOKEN: ${{ secrets.PAT_PAGES }}
-        if: env.WIKI_TOKEN != ''
+      - name: Checkout Wiki Repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki-tmp
+          token: ${{ secrets.PAT_PAGES }}
+
+      - name: Sync files to Wiki
+        if: secrets.PAT_PAGES != ''
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git clone https://${{ github.actor }}:${{ secrets.PAT_PAGES }}@github.com/${{ github.repository }}.wiki.git .wiki-tmp
+          cd wiki-tmp
 
           # Mevcut wiki dosyalarını temizle (Home.md ve _Sidebar.md hariç)
-          find .wiki-tmp -maxdepth 1 -name "*.md" ! -name "Home.md" ! -name "_Sidebar.md" -delete
-          rm -rf .wiki-tmp/en
+          find . -maxdepth 1 -name "*.md" ! -name "Home.md" ! -name "_Sidebar.md" -delete
+          rm -rf en
 
           # Türkçe wiki dosyalarını kopyala
-          cp wiki/*.md .wiki-tmp/
+          cp ../main-repo/wiki/*.md ./
           # İngilizce wiki dosyalarını kopyala
-          mkdir -p .wiki-tmp/en
-          cp wiki/en/*.md .wiki-tmp/en/
+          mkdir -p en
+          cp ../main-repo/wiki/en/*.md en/
 
-          cd .wiki-tmp
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to GitHub Wiki"
