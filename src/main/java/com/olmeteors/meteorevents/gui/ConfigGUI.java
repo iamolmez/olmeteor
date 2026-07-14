@@ -35,6 +35,8 @@ public final class ConfigGUI implements Listener {
     private static final int PAGE_AUTO = 6;
     private static final int PAGE_TYPES_MENU = 7;
     private static final int PAGE_TYPE_EDIT = 8;
+    private static final int PAGE_LOOT_MENU = 9;
+    private static final int PAGE_LOOT_EDIT = 10;
 
     private static final int[] BORDER_SLOTS = {0,1,2,3,4,5,6,7,8,45,46,47,48,49,50,51,52,53};
     private static final int BACK_SLOT = 45;
@@ -122,6 +124,8 @@ public final class ConfigGUI implements Listener {
                 "&7Aralık, TPS koruması, konum soğuması"));
         s.inventory.setItem(16, item(Material.FIRE_CHARGE, "&dMeteor Türleri",
                 "&7Her tür için yarıçap, boss, süre"));
+        s.inventory.setItem(22, item(Material.CHEST, "&6Loot Ayarları",
+                "&7Her tür için loot bloğu, erişim modu, kişisel/ortak"));
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -354,6 +358,8 @@ public final class ConfigGUI implements Listener {
             case PAGE_AUTO -> handleAutoClick(s, slot, event);
             case PAGE_TYPES_MENU -> handleTypesMenuClick(s, slot, event);
             case PAGE_TYPE_EDIT -> handleTypeEditClick(s, slot, event);
+            case PAGE_LOOT_MENU -> handleLootMenuClick(s, slot, event);
+            case PAGE_LOOT_EDIT -> handleLootEditClick(s, slot, event);
         }
     }
 
@@ -367,6 +373,7 @@ public final class ConfigGUI implements Listener {
         else if (slot == 14) drawFallVaultPage(s);
         else if (slot == 15) drawAutoPage(s);
         else if (slot == 16) drawTypesMenu(s);
+        else if (slot == 22) drawLootMenuPage(s);
     }
 
     private void handleLocationClick(Session s, int slot, InventoryClickEvent event) {
@@ -493,6 +500,96 @@ public final class ConfigGUI implements Listener {
     }
 
     // ────────────────────────────────────────────────────────────────
+    //  LOOT PAGES
+    // ────────────────────────────────────────────────────────────────
+
+    private void drawLootMenuPage(Session s) {
+        s.page = PAGE_LOOT_MENU;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Ana Menü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        int slot = 10;
+        for (MeteorType type : MeteorType.values()) {
+            if (slot >= 35) break;
+            s.inventory.setItem(slot++, item(Material.CHEST,
+                    config.getMeteorTypeColor(type) + config.getMeteorTypeName(type),
+                    "&7Bloğu: " + config.getLootBlockMaterial(type).name(),
+                    "&7Mod: " + config.getLootAccessMode(type),
+                    "&7Kişisel: " + (config.isPersonalLoot(type) ? "&aEvet" : "&cHayır"),
+                    "&7&lTıkla düzenle"));
+        }
+    }
+
+    private void drawLootEditPage(Session s) {
+        s.page = PAGE_LOOT_EDIT;
+        s.inventory.clear();
+        fillBorder(s);
+        s.inventory.setItem(BACK_SLOT, item(Material.ARROW, "&7← Loot Menüsü"));
+        s.inventory.setItem(SAVE_SLOT, item(Material.EMERALD_BLOCK, "&a&lKaydet ve Kapat"));
+        final MeteorType type = s.editingType;
+        if (type == null) return;
+        s.inventory.setItem(10, item(s.editPersonalLoot ? Material.LIME_DYE : Material.GRAY_DYE,
+                "&eKişisel Loot: " + (s.editPersonalLoot ? "&a&lAÇIK" : "&c&lKAPALI"),
+                "&7Açık: her oyuncuya ayrı ganimet",
+                "&7Kapalı: herkes için ortak envanter",
+                "&7Tıkla değiştir"));
+        s.inventory.setItem(11, item(s.editLootBlock != null ? s.editLootBlock : Material.CHEST,
+                "&dLoot Bloğu: &f" + (s.editLootBlock != null ? s.editLootBlock.name() : "CHEST"),
+                "&7İmleçte blokla tıkla değiştir",
+                "&7Sol/sağ: önceden tanımlı bloklar"));
+        s.inventory.setItem(12, item(Material.COMPASS, "&6Erişim Modu: &f" + s.editAccessMode,
+                "&7AUTO: etkileşimli blok sağ tık, diğer kazma",
+                "&7INTERACT: sadece sağ tık",
+                "&7BREAK: sadece kazma",
+                "&7BOTH: hem sağ tık hem kazma",
+                "&7Sol/sağ tıkla değiştir"));
+    }
+
+    private void handleLootMenuClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawMainMenu(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        final int typeIndex = slot - 10;
+        final MeteorType[] types = MeteorType.values();
+        if (typeIndex >= 0 && typeIndex < types.length) {
+            s.editingType = types[typeIndex];
+            s.editLootBlock = config.getLootBlockMaterial(s.editingType);
+            s.editAccessMode = config.getLootAccessMode(s.editingType);
+            s.editPersonalLoot = config.isPersonalLoot(s.editingType);
+            drawLootEditPage(s);
+        }
+    }
+
+    private void handleLootEditClick(Session s, int slot, InventoryClickEvent event) {
+        if (slot == BACK_SLOT) { drawLootMenuPage(s); return; }
+        if (slot == SAVE_SLOT) { saveAll(s); close(s, event); return; }
+        final boolean right = event.isRightClick();
+        if (slot == 10) { s.editPersonalLoot = !s.editPersonalLoot; drawLootEditPage(s); }
+        else if (slot == 11) changeEditLootBlock(s, event.getCursor(), right ? -1 : 1);
+        else if (slot == 12) cycleAccessMode(s, right ? -1 : 1);
+        drawLootEditPage(s);
+    }
+
+    private void changeEditLootBlock(Session s, ItemStack cursor, int delta) {
+        if (cursor != null && !cursor.isEmpty() && cursor.getType().isBlock()
+                && cursor.getType().isItem()) {
+            s.editLootBlock = cursor.getType();
+            return;
+        }
+        if (s.editLootBlock == null) { s.editLootBlock = LOOT_BLOCKS[0]; return; }
+        int idx = 0;
+        for (int i = 0; i < LOOT_BLOCKS.length; i++) if (LOOT_BLOCKS[i] == s.editLootBlock) idx = i;
+        s.editLootBlock = LOOT_BLOCKS[Math.floorMod(idx + delta, LOOT_BLOCKS.length)];
+    }
+
+    private void cycleAccessMode(Session s, int delta) {
+        final String[] modes = {"AUTO", "INTERACT", "BREAK", "BOTH"};
+        int idx = 0;
+        for (int i = 0; i < modes.length; i++) if (modes[i].equals(s.editAccessMode)) idx = i;
+        s.editAccessMode = modes[Math.floorMod(idx + delta, modes.length)];
+    }
+
+    // ────────────────────────────────────────────────────────────────
     //  HELPERS
     // ────────────────────────────────────────────────────────────────
 
@@ -612,6 +709,10 @@ public final class ConfigGUI implements Listener {
         if (s.editingType != null) {
             saveTypeEdits(s);
         }
+        // Loot edits (yalnızca loot sayfası ziyaret edildiyse)
+        if (s.editLootBlock != null && s.editAccessMode != null) {
+            saveLootEdits(s);
+        }
         // Save to disk
         try {
             fileConfig.save(new java.io.File(plugin.getDataFolder(), "config.yml"));
@@ -639,6 +740,16 @@ public final class ConfigGUI implements Listener {
         fileConfig.set(base + "slow-fall-duration-seconds", s.editSlowFall);
         fileConfig.set(base + "waves.count", s.editWaveCount);
         fileConfig.set(base + "waves.interval-seconds", s.editWaveInterval);
+    }
+
+    private void saveLootEdits(Session s) {
+        if (s.editingType == null) return;
+        final MeteorType type = s.editingType;
+        final String base = "meteor-types." + type.name().toLowerCase(Locale.ROOT) + ".loot.";
+        final var fileConfig = config.getConfig();
+        fileConfig.set(base + "block", s.editLootBlock != null ? s.editLootBlock.name() : "CHEST");
+        fileConfig.set(base + "access-mode", s.editAccessMode);
+        fileConfig.set(base + "personal", s.editPersonalLoot);
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -708,5 +819,9 @@ public final class ConfigGUI implements Listener {
         String editBossMobId;
         RadiusShape editShape;
         MeteorFallMode editFallMode;
+        // Loot edit
+        Material editLootBlock;
+        String editAccessMode;
+        boolean editPersonalLoot;
     }
 }
